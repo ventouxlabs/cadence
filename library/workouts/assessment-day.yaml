@@ -1,0 +1,73 @@
+# docs/exercise-principles.md section 10.10 - `assessment-day`, both profiles.
+# Order is fixed and the grip tests are separated so dead_hang_s is not contaminated by
+# farmer_carry_s. No autoregulation runs on this session, and the session-length row count does
+# not truncate it: the battery is the point.
+#
+# Three departures from the prose, all logged as D-062: row 6 is prescribed in metres because
+# section 9.5 defines farmer-carry as a `meters` movement (PRP-07 records the seconds), the youth
+# goblet-squat column prescribes 8 reps rather than 5 because 5 is under the youth loaded-rep
+# floor, and youth reps and seconds are replaced per band from `youth_targets` in
+# library/assessments.yaml wherever the test is not self-rated (`assessment_id`, D-056).
+version: 1
+kind: workout
+id: assessment-day
+name: Assessment day
+day_type: assessment
+target_profile_kind: both
+variant: null
+prelude: posture-prelude-v1
+rows:
+  - exercise: wall-angel
+    role: assessment
+    assessment_id: wall_angel_reach
+    sets: 1
+    reps: 8
+    rest_s: 60
+    cue_override: Slide as high as contact holds, then score yourself nought to three.
+    load_rule: { mode: bodyweight }
+
+  - exercise: goblet-squat
+    role: assessment
+    assessment_id: goblet_squat_quality
+    adult:
+      { sets: 1, reps: 5, rest_s: 90, load_rule: { mode: ladder, kg: 12.0 } }
+    youth:
+      {
+        sets: 1,
+        reps: 8,
+        rest_s: 90,
+        load_rule: { mode: ladder, max_kg: 8.0 },
+        u10_sub: bodyweight-squat,
+      }
+
+  - exercise: push-up
+    role: assessment
+    assessment_id: push_up_max
+    adult: { sets: 1, reps: 20, rest_s: 180, load_rule: { mode: bodyweight } }
+    youth: { sets: 1, reps: 8, rest_s: 90, load_rule: { mode: bodyweight } }
+
+  - exercise: dead-hang
+    role: assessment
+    assessment_id: dead_hang_s
+    adult: { sets: 1, seconds: 60, rest_s: 180, load_rule: { mode: bodyweight } }
+    youth: { sets: 1, seconds: 20, rest_s: 90, load_rule: { mode: bodyweight } }
+
+  - exercise: plank
+    role: assessment
+    assessment_id: plank_s
+    adult: { sets: 1, seconds: 120, rest_s: 180, load_rule: { mode: bodyweight } }
+    youth: { sets: 1, seconds: 30, rest_s: 90, load_rule: { mode: bodyweight } }
+
+  - exercise: farmer-carry
+    role: assessment
+    assessment_id: farmer_carry_s
+    adult: { sets: 1, meters: 40, rest_s: 0, load_rule: { mode: ladder, kg: 16.0 } }
+    youth:
+      {
+        sets: 1,
+        meters: 15,
+        rest_s: 60,
+        load_rule: { mode: ladder, max_kg: 5.0 },
+        u10_sub: bear-crawl,
+      }
+extras: []

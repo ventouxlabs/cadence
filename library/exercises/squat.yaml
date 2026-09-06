@@ -1,0 +1,129 @@
+# docs/exercise-principles.md section 9.2 - Squat. Transcribed verbatim.
+version: 1
+kind: exercises
+exercises:
+  - id: bodyweight-squat
+    name: Bodyweight squat
+    pattern: squat
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Knees track over toes, chest tall, sit between the hips.
+    garmin_category: SQUAT
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: box-squat-bench
+    name: Box squat to bench
+    pattern: squat
+    region: lower
+    load_type: bench_assisted
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight, bench]
+    tags: []
+    cue: Sit back to the bench, touch, stand without rocking.
+    garmin_category: SQUAT
+    garmin_exercise: null
+    regression_of: bodyweight-squat
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: goblet-squat
+    name: Goblet squat
+    pattern: squat
+    region: lower
+    load_type: dumbbell
+    load_unit: per_implement
+    measure: reps
+    equipment: [dumbbells]
+    tags: []
+    cue: Hold the bell at the chest, elbows inside the knees.
+    garmin_category: SQUAT
+    garmin_exercise: null
+    regression_of: null
+    progression_of: bodyweight-squat
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: wall-sit
+    name: Wall sit
+    pattern: squat
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: seconds
+    equipment: [bodyweight]
+    tags: []
+    cue: Thighs parallel, back flat to the wall, breathe steadily.
+    garmin_category: SQUAT
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: time-progression-hold
+    est_seconds_per_set: 40
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: reverse-lunge
+    name: Reverse lunge
+    pattern: squat
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: [unilateral]
+    cue: Step back and down, front shin vertical, torso upright.
+    garmin_category: LUNGE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: split-squat
+    name: Split squat
+    pattern: squat
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: [unilateral]
+    cue: Feet on train tracks, back knee to the floor, no wobble.
+    garmin_category: LUNGE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: reverse-lunge
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: step-up-bench
+    name: Step-up to bench
+    pattern: squat
+    region: lower
+    load_type: bench_assisted
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight, bench]
+    tags: [unilateral]
+    cue: Drive through the whole foot, no push off the back leg.
+    garmin_category: LUNGE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }

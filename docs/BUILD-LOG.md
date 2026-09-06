@@ -15,3 +15,17 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Codex (gpt-5.6-terra) review: 2 Highs overlapping, 3 Mediums (NaN bodyweight, ceilings as warnings, shallow frozen) fixed; strict numerics added.
 - Final: 454 passed, 4 skipped, 99% coverage, lint clean. Decisions D-028..D-037 (+D-040..D-048 from PRP-05 landed in the same tree).
 - Squash-merged to main, tagged prp-00, pushed.
+
+## prp-05 — vitalforge-activity — 2026-09-06 (VitalForge clone, branch cadence/activity-endpoint @ 851eb2d, never pushed)
+- Implementer built table, models, route, Garmin helpers, read routes, docs; suite 676 → 771.
+- Reviewer: 2 Highs (post-commit claim let concurrent POSTs double-push; parse outside never-raise helper) fixed via in-transaction claim column; re-verified APPROVE.
+- Codex (gpt-5.6-terra, second run after a stdin hang): 1 High (ambiguous outcomes retryable) → `unknown` state + reconciliation by lookup; 3 Mediums + 1 Low fixed; `garmin_error` sanitised.
+- Final: 832 passed, ruff clean; probe checklist for JD's live Garmin account left in the PRP; D-040..D-049.
+- Tag prp-05 is placed on Cadence main after PRP-01 merges (docs-only closeout).
+
+## prp-01 — library-program — 2026-09-06
+- Implementer transcribed §9/§10 (52 exercises, 11 workouts), built loader, program engine, profile/setting tables, seed (572 tests).
+- Tester added 317 tests incl. principles-parity parser, 480-config program matrix, load grammar; fixed 0 kg rung; reported 1000 kg ceiling (fixed).
+- Reviewer swept 15,744 compiled sessions (zero cap breaches); 3 Highs (seed deleted done sessions, no backfill for dropped main, fallback_exercise unread) + 4 Mediums fixed; re-verify found 1 more High (one-hop demotion) fixed via BFS + pattern fallback.
+- Final: 945 passed, 94% coverage, lint clean, seed idempotent. D-050..D-068.
+- Squash-merged to main, tagged prp-01 (and prp-05 close-out tag placed on main), pushed.

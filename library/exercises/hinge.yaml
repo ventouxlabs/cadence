@@ -1,0 +1,133 @@
+# docs/exercise-principles.md section 9.1 - Hinge. Transcribed verbatim: ids, names, enums, cues,
+# youth columns and Garmin categories all come from that table. A mismatch is a bug in the code,
+# never in this file. Y* (kb-deadlift, kb-swing) is `conditional` per section 3.6.
+version: 1
+kind: exercises
+exercises:
+  - id: hip-hinge-bw
+    name: Bodyweight hip hinge
+    pattern: hinge
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Push hips back, shins vertical, chest proud.
+    garmin_category: DEADLIFT
+    garmin_exercise: null
+    regression_of: db-rdl
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: glute-bridge
+    name: Glute bridge
+    pattern: hinge
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Ribs down, squeeze glutes, pause two seconds up top.
+    garmin_category: HIP_RAISE
+    garmin_exercise: null
+    regression_of: bench-hip-thrust
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    # Prelude row 4 (section 2), so 60 s and excluded from the youth exercise count (D-053).
+    est_seconds_per_set: 60
+    is_prelude: true
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: bench-hip-thrust
+    name: Bench hip thrust
+    pattern: hinge
+    region: lower
+    load_type: bench_assisted
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight, bench]
+    tags: []
+    cue: Shoulder blades on the bench, chin tucked, hips to level.
+    garmin_category: HIP_RAISE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: db-rdl
+    name: Dumbbell Romanian deadlift
+    pattern: hinge
+    region: lower
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells]
+    tags: []
+    cue: Hinge back, bar-path close to the legs, stop at mid-shin.
+    garmin_category: DEADLIFT
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: single-leg-rdl-db
+    name: Single-leg DB RDL
+    pattern: hinge
+    region: lower
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells]
+    tags: [unilateral]
+    cue: Hips square, back leg long, reach the floor slowly.
+    garmin_category: DEADLIFT
+    garmin_exercise: null
+    regression_of: null
+    progression_of: db-rdl
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "no", age_14_17: "yes" }
+
+  - id: kb-deadlift
+    name: Kettlebell deadlift
+    pattern: hinge
+    region: lower
+    load_type: kettlebell
+    load_unit: per_implement
+    measure: reps
+    equipment: [kettlebells]
+    tags: []
+    cue: Bell between the arches, push the floor away, stand tall.
+    garmin_category: DEADLIFT
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "no", age_14_17: "conditional" }
+
+  - id: kb-swing
+    name: Kettlebell swing
+    pattern: hinge
+    region: full
+    load_type: kettlebell
+    load_unit: per_implement
+    measure: reps
+    equipment: [kettlebells]
+    tags: []
+    cue: Snap the hips, float the bell, never squat it up.
+    garmin_category: TOTAL_BODY
+    garmin_exercise: null
+    regression_of: null
+    progression_of: kb-deadlift
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "no", age_14_17: "conditional" }

@@ -1,0 +1,116 @@
+# docs/exercise-principles.md section 9.7 - Mobility. Transcribed verbatim.
+# cat-cow, open-book and wall-angel are posture-prelude movements (section 2), so they carry
+# is_prelude and section 2's own per-set seconds; see D-053.
+version: 1
+kind: exercises
+exercises:
+  - id: cat-cow
+    name: Cat-cow
+    pattern: mobility
+    region: full
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Move one vertebra at a time, breathe with the movement.
+    garmin_category: WARM_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 45
+    is_prelude: true
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: open-book
+    name: Open book
+    pattern: mobility
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: [unilateral]
+    cue: Knees stacked and still, let the top arm draw a wide arc.
+    garmin_category: WARM_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 60
+    is_prelude: true
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: wall-angel
+    name: Wall angel
+    pattern: mobility
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Wrists and low back on the wall, slide slow, stop at contact.
+    garmin_category: WARM_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 45
+    is_prelude: true
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: scap-push-up
+    name: Scapular push-up
+    pattern: mobility
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Arms locked, only the shoulder blades move, push and sink.
+    garmin_category: WARM_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: hip-90-90-switch
+    name: 90/90 hip switch
+    pattern: mobility
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Sit tall, sweep the knees floor to floor, hands off if you can.
+    garmin_category: WARM_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: couch-stretch
+    name: Couch stretch
+    pattern: mobility
+    region: lower
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: seconds
+    equipment: [bodyweight, bench]
+    tags: [unilateral]
+    cue: Back foot up the bench, tuck the tail, breathe out the tension.
+    garmin_category: WARM_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: time-progression-hold
+    est_seconds_per_set: 40
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }

@@ -1,0 +1,56 @@
+# docs/exercise-principles.md section 2 - the posture prelude. Runs first in EVERY session for
+# both profiles (D-051), is never progressed, never autoregulated and never skipped.
+# Order is fixed. Rest between prelude movements is 0 s: it is a continuous flow.
+#
+# Youth variant (same id, variant: "youth"): row 5 dead-bug is dropped and row 2 open-book drops
+# to 4 per side, for a total of 220 s instead of 300 s.
+version: 1
+kind: workout
+id: posture-prelude-v1
+name: Posture prelude
+# DayType has no prelude member; this template is never scheduled on its own, it is prepended.
+day_type: mobility_carry
+target_profile_kind: both
+variant: null
+prelude: null
+rows:
+  - exercise: cat-cow
+    role: prelude
+    sets: 1
+    reps: 8
+    rest_s: 0
+    load_rule: { mode: bodyweight }
+
+  - exercise: open-book
+    role: prelude
+    sets: 1
+    reps: 6
+    per_side: true
+    rest_s: 0
+    load_rule: { mode: bodyweight }
+    youth: { sets: 1, reps: 4, rest_s: 0, load_rule: { mode: bodyweight } }
+
+  - exercise: wall-angel
+    role: prelude
+    sets: 1
+    reps: 8
+    rest_s: 0
+    load_rule: { mode: bodyweight }
+
+  - exercise: glute-bridge
+    role: prelude
+    sets: 1
+    reps: 12
+    rest_s: 0
+    cue_override: Ribs down, squeeze glutes, hold two seconds at the top.
+    load_rule: { mode: bodyweight }
+
+  - exercise: dead-bug
+    role: prelude
+    sets: 1
+    reps: 8
+    per_side: true
+    rest_s: 0
+    youth_skip: true
+    load_rule: { mode: bodyweight }
+extras: []

@@ -37,7 +37,8 @@ ENV_VARS = (
     "TZ",
 )
 
-YOUTH_RULES_PATH = Path(__file__).resolve().parents[1] / "library" / "youth_rules.yaml"
+LIBRARY_PATH = Path(__file__).resolve().parents[1] / "library"
+YOUTH_RULES_PATH = LIBRARY_PATH / "youth_rules.yaml"
 
 
 @pytest.fixture
@@ -94,3 +95,33 @@ def exercise_catalog() -> dict[str, Exercise]:
     from tests.factories import CATALOG
 
     return dict(CATALOG)
+
+
+@pytest.fixture(scope="session")
+def library():
+    """The real ``library/`` directory, loaded and validated once for the whole run."""
+    from cadence.bibliotheque.loader import load_library
+
+    return load_library(LIBRARY_PATH)
+
+
+@pytest.fixture
+def adult_profile():
+    from cadence.profils.tables import Profile
+
+    return Profile(id="me", display_name="Me", kind="adult", push_to_garmin=True)
+
+
+@pytest.fixture
+def youth_profile():
+    """The seeded son: youth, no recorded age, so the strictest band (principles section 3.8)."""
+    from cadence.profils.tables import Profile
+
+    return Profile(id="son", display_name="Son", kind="youth", age_years=None)
+
+
+@pytest.fixture
+def program_settings():
+    from cadence.profils.settings import DEFAULT_SETTINGS
+
+    return DEFAULT_SETTINGS

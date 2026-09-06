@@ -1,0 +1,68 @@
+# docs/exercise-principles.md section 10.9 - `together-full-body`, both profiles, day type
+# lower_full_b. Shared exercise ids with per-profile load, rep and rest columns resolved
+# independently; the son's column is validated against his band exactly as a solo session would
+# be. At u10 rows 1-4 fall back through the same `u10_sub` mechanism as section 10.6.
+version: 1
+kind: workout
+id: together-full-body
+name: Together full body
+day_type: lower_full_b
+target_profile_kind: both
+variant: null
+prelude: posture-prelude-v1
+rows:
+  - exercise: goblet-squat
+    role: main
+    adult:
+      { sets: 3, reps: 10, rest_s: 90, load_rule: { mode: ladder, pct_of_heaviest: 0.55 } }
+    youth:
+      {
+        sets: 2,
+        reps: 10,
+        rest_s: 60,
+        load_rule: { mode: ladder, max_kg: 8.0 },
+        u10_sub: bodyweight-squat,
+      }
+
+  - exercise: push-up
+    role: secondary
+    adult: { sets: 3, reps: 12, rest_s: 60, load_rule: { mode: bodyweight } }
+    youth:
+      {
+        sets: 2,
+        reps: 8,
+        rest_s: 60,
+        load_rule: { mode: bodyweight },
+        u10_sub: incline-push-up-bench,
+      }
+
+  - exercise: db-bent-row
+    role: secondary
+    adult:
+      { sets: 3, reps: 10, rest_s: 60, load_rule: { mode: ladder, pct_of_heaviest: 0.45 } }
+    youth:
+      {
+        sets: 2,
+        reps: 10,
+        rest_s: 60,
+        load_rule: { mode: ladder, max_kg: 5.0 },
+        u10_sub: prone-ytw-raise,
+      }
+
+  - exercise: farmer-carry
+    role: secondary
+    adult: { sets: 3, meters: 30, rest_s: 90, load_rule: { mode: ladder, kg: 16.0 } }
+    youth:
+      {
+        sets: 2,
+        meters: 15,
+        rest_s: 60,
+        load_rule: { mode: ladder, max_kg: 5.0 },
+        u10_sub: bear-crawl,
+      }
+
+  - exercise: plank
+    role: finisher
+    adult: { sets: 3, seconds: 45, rest_s: 45, load_rule: { mode: bodyweight } }
+    youth: { sets: 2, seconds: 20, rest_s: 60, load_rule: { mode: bodyweight } }
+extras: []

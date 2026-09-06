@@ -1,0 +1,50 @@
+# docs/exercise-principles.md section 10.6 - `son-upper-a`, youth, day type upper_a.
+# Specified at the age_10_13 band. `u10_sub` names the automatic substitute when the band is u10,
+# where dumbbell rows are illegal (section 3.2). Band check at u10: 5 rows <= 5, 2 sets <= 2,
+# loaded reps 10 >= 8, rest 60 s >= 60, no banned tags.
+version: 1
+kind: workout
+id: son-upper-a
+name: Son upper A
+day_type: upper_a
+target_profile_kind: youth
+variant: youth
+prelude: posture-prelude-v1
+rows:
+  - exercise: incline-push-up-bench
+    role: main
+    sets: 2
+    reps: 10
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: bench-supported-db-row
+    role: secondary
+    sets: 2
+    reps: 10
+    rest_s: 60
+    u10_sub: prone-ytw-raise
+    load_rule: { mode: ladder, max_kg: 5.0 }
+
+  - exercise: pike-push-up
+    role: secondary
+    sets: 2
+    reps: 8
+    rest_s: 60
+    u10_sub: scap-push-up
+    load_rule: { mode: bodyweight }
+
+  - exercise: bear-crawl
+    role: secondary
+    sets: 2
+    meters: 10
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: plank
+    role: finisher
+    sets: 2
+    seconds: 20
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+extras: []

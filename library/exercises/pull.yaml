@@ -1,0 +1,167 @@
+# docs/exercise-principles.md section 9.4 - Pull. Transcribed verbatim.
+# The three `requires_anchor` movements are filtered out of every session when the profile has no
+# overhead anchor (section 1.7); db-floor-pullover and bench-supported-db-row are their stand-ins.
+version: 1
+kind: exercises
+exercises:
+  - id: prone-ytw-raise
+    name: Prone Y/T/W raise
+    pattern: pull_h
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Face down, thumbs up, lift from the shoulder blades.
+    garmin_category: FLYE
+    garmin_exercise: null
+    regression_of: bench-supported-db-row
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: bench-supported-db-row
+    name: Bench-supported DB row
+    pattern: pull_h
+    region: upper
+    load_type: bench_assisted
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells, bench]
+    tags: []
+    cue: Chest on the incline, row to the hip, no torso twist.
+    garmin_category: ROW
+    garmin_exercise: null
+    regression_of: db-bent-row
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: db-bent-row
+    name: DB bent-over row
+    pattern: pull_h
+    region: upper
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells]
+    tags: []
+    cue: Hinge to forty-five, row to the ribs, elbows past the back.
+    garmin_category: ROW
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: kb-row
+    name: Kettlebell row
+    pattern: pull_h
+    region: upper
+    load_type: kettlebell
+    load_unit: per_hand
+    measure: reps
+    equipment: [kettlebells]
+    tags: []
+    cue: Brace hard, pull the bell to the hip, pause one second.
+    garmin_category: ROW
+    garmin_exercise: null
+    regression_of: null
+    progression_of: db-bent-row
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "no", age_14_17: "conditional" }
+
+  - id: db-rear-delt-raise
+    name: DB rear-delt raise
+    pattern: pull_h
+    region: upper
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells]
+    tags: []
+    cue: Hinge over, sweep wide, squeeze the shoulder blades.
+    garmin_category: FLYE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: inverted-row
+    name: Inverted row
+    pattern: pull_h
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: [requires_anchor]
+    cue: Body one line, pull the chest to the bar, hips level.
+    garmin_category: ROW
+    garmin_exercise: null
+    regression_of: null
+    progression_of: bench-supported-db-row
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: dead-hang
+    name: Dead hang
+    pattern: pull_v
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: seconds
+    equipment: [bodyweight]
+    tags: [requires_anchor, grip_limited]
+    cue: Overhand grip, shoulders active, breathe and just hang.
+    garmin_category: PULL_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: time-progression-hold
+    est_seconds_per_set: 40
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: scap-pull-hang
+    name: Scapular pull from hang
+    pattern: pull_v
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: [requires_anchor]
+    cue: Hang long, then pull the shoulders down without bending.
+    garmin_category: PULL_UP
+    garmin_exercise: null
+    regression_of: dead-hang
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: db-floor-pullover
+    name: DB floor pullover
+    pattern: pull_v
+    region: upper
+    load_type: dumbbell
+    load_unit: per_implement
+    measure: reps
+    equipment: [dumbbells]
+    tags: [overhead_loaded]
+    cue: Ribs pinned to the floor, arms soft, stop at the ears.
+    garmin_category: FLYE
+    garmin_exercise: null
+    regression_of: dead-hang
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "no", age_14_17: "yes" }

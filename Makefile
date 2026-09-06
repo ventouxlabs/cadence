@@ -16,7 +16,7 @@ lint:  ## The CI gate
 fmt:  ## Format and autofix in place
 	uv run ruff format . && uv run ruff check --fix .
 
-seed:  ## Load library/ into the database (PRP-01 fills the loader)
+seed:  ## Load library/ into the database and build a block per profile
 	uv run python -m cadence.bibliotheque.seed
 
 e2e:  ## Playwright, 390x844 (PRP-02 adds the tests)

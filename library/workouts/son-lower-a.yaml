@@ -1,0 +1,48 @@
+# docs/exercise-principles.md section 10.7 - `son-lower-a`, youth, day type lower_a.
+# Every row is bodyweight, so this workout is legal unchanged at every band.
+version: 1
+kind: workout
+id: son-lower-a
+name: Son lower A
+day_type: lower_a
+target_profile_kind: youth
+variant: youth
+prelude: posture-prelude-v1
+rows:
+  - exercise: bodyweight-squat
+    role: main
+    sets: 2
+    reps: 12
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: glute-bridge
+    role: secondary
+    sets: 2
+    reps: 12
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: reverse-lunge
+    role: secondary
+    sets: 2
+    reps: 8
+    per_side: true
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: line-balance-walk
+    role: secondary
+    sets: 2
+    meters: 10
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: dead-bug
+    role: finisher
+    sets: 2
+    reps: 8
+    per_side: true
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+extras: []

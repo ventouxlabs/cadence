@@ -1,0 +1,76 @@
+# Progression-as-data - docs/exercise-principles.md section 5.1, one document per section 5.2
+# default. Parsed by PRP-00's `Progression` model, so the field names here are principles' own.
+#
+# One shape serves two lives: the default stored on a seed exercise via `default_progression`, and
+# the per-row mutable state `materialise_rows` copies into `rows_json` for PRP-07 to rewrite. The
+# copy overrides `rep_min` with the template's own week-1 value (D-057), so the numbers below are
+# the library fallback, not the prescription.
+#
+# `allow_load_progression` is true on every document here: section 5.6 turns it off per row from
+# the band, and `cap_load_kg` is injected by the validator from section 3.3. Neither belongs in a
+# library default.
+version: 1
+kind: progressions
+progressions:
+  - id: double-progression-loaded
+    type: double_progression
+    rep_min: 8
+    rep_max: 12
+    # One step clears one rung of the household dumbbell ladder (1.13 kg) with room to spare, so a
+    # bump survives the re-round of section 5.5 instead of landing back on the rung it started on.
+    load_step_kg: 1.25
+    load_step_pct: null
+    time_step_s: null
+    distance_step_m: null
+    regress_on: [hard, missed, low_readiness]
+    regress_step: 0.10
+    regress_reps: 2
+    deload_pct: 0.60
+    allow_load_progression: true
+    cap_load_kg: null
+
+  - id: rep-progression-bodyweight
+    type: rep_progression
+    rep_min: 8
+    rep_max: 20
+    load_step_kg: null
+    load_step_pct: null
+    time_step_s: null
+    distance_step_m: null
+    regress_on: [hard, missed, low_readiness]
+    regress_step: 0.10
+    regress_reps: 2
+    deload_pct: 0.60
+    allow_load_progression: true
+    cap_load_kg: null
+
+  - id: time-progression-hold
+    type: time_progression
+    rep_min: null
+    rep_max: null
+    load_step_kg: null
+    load_step_pct: null
+    time_step_s: 10
+    distance_step_m: null
+    regress_on: [hard, missed, low_readiness]
+    regress_step: 0.10
+    regress_reps: 2
+    deload_pct: 0.60
+    allow_load_progression: true
+    cap_load_kg: null
+
+  # Section 5.2: meters and steps use time_progression with distance_step_m in place of time_step_s.
+  - id: distance-progression-carry
+    type: time_progression
+    rep_min: null
+    rep_max: null
+    load_step_kg: null
+    load_step_pct: null
+    time_step_s: null
+    distance_step_m: 10
+    regress_on: [hard, missed, low_readiness]
+    regress_step: 0.10
+    regress_reps: 2
+    deload_pct: 0.60
+    allow_load_progression: true
+    cap_load_kg: null

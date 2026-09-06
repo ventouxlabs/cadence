@@ -1,0 +1,113 @@
+# docs/exercise-principles.md section 9.6 - Brace and anti-rotation. Transcribed verbatim.
+version: 1
+kind: exercises
+exercises:
+  - id: dead-bug
+    name: Dead bug
+    pattern: brace
+    region: core
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Low back glued to the floor, move slow, exhale on reach.
+    garmin_category: CORE
+    garmin_exercise: null
+    regression_of: plank
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    # Prelude row 5 (section 2), dropped in the youth variant.
+    est_seconds_per_set: 60
+    is_prelude: true
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: bird-dog
+    name: Bird dog
+    pattern: brace
+    region: core
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Long spine, no hip tilt, reach opposite hand and heel.
+    garmin_category: CORE
+    garmin_exercise: null
+    regression_of: plank
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: plank
+    name: Forearm plank
+    pattern: brace
+    region: core
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: seconds
+    equipment: [bodyweight]
+    tags: []
+    cue: Elbows under shoulders, squeeze glutes, one straight line.
+    garmin_category: PLANK
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: time-progression-hold
+    est_seconds_per_set: 40
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: hollow-hold
+    name: Hollow hold
+    pattern: brace
+    region: core
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: seconds
+    equipment: [bodyweight]
+    tags: []
+    cue: Low back pressed down, arms by the ears, shins together.
+    garmin_category: CORE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: plank
+    default_progression: time-progression-hold
+    est_seconds_per_set: 40
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: side-plank
+    name: Side plank
+    pattern: rotate_anti
+    region: core
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: seconds
+    equipment: [bodyweight]
+    tags: [unilateral]
+    cue: Stack the hips, push the floor away, do not sag.
+    garmin_category: PLANK
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: time-progression-hold
+    est_seconds_per_set: 40
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: half-kneeling-db-antirotation-hold
+    name: Half-kneeling DB anti-rotation hold
+    pattern: rotate_anti
+    region: core
+    load_type: dumbbell
+    load_unit: per_implement
+    measure: seconds
+    equipment: [dumbbells]
+    tags: [unilateral]
+    cue: Hold the bell out front, resist the twist, stay square.
+    garmin_category: CORE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: time-progression-hold
+    est_seconds_per_set: 40
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }

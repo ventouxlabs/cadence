@@ -1,0 +1,66 @@
+# docs/exercise-principles.md section 10.3 - `lower-a`, adult, day type lower_a.
+# Row 3's "or per_hand at 50 % of RDL load" is not expressible: section 9.2 defines reverse-lunge
+# as a bodyweight movement with load_unit bodyweight, and a loaded row would fail the validator's
+# load-unit agreement check. The row stays bodyweight.
+version: 1
+kind: workout
+id: lower-a
+name: Lower A
+day_type: lower_a
+target_profile_kind: adult
+variant: null
+prelude: posture-prelude-v1
+rows:
+  - exercise: goblet-squat
+    role: main
+    sets: 3
+    reps: 8
+    rest_s: 90
+    rpe_target: 8
+    load_rule: { mode: ladder, pct_of_heaviest: 0.55 }
+
+  - exercise: db-rdl
+    role: secondary
+    sets: 3
+    reps: 8
+    rest_s: 90
+    rpe_target: 8
+    load_rule: { mode: ladder, pct_of_heaviest: 0.5 }
+
+  - exercise: reverse-lunge
+    role: secondary
+    sets: 3
+    reps: 10
+    per_side: true
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: bench-hip-thrust
+    role: secondary
+    sets: 3
+    reps: 12
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: side-plank
+    role: finisher
+    sets: 2
+    seconds: 30
+    per_side: true
+    rest_s: 45
+    load_rule: { mode: bodyweight }
+extras:
+  - exercise: wall-sit
+    role: secondary
+    sets: 2
+    seconds: 45
+    rest_s: 45
+    load_rule: { mode: bodyweight }
+
+  - exercise: hip-90-90-switch
+    role: secondary
+    sets: 2
+    reps: 8
+    per_side: true
+    rest_s: 30
+    load_rule: { mode: bodyweight }

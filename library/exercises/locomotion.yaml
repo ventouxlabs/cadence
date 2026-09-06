@@ -1,0 +1,95 @@
+# docs/exercise-principles.md section 9.8 - Locomotion and play. Transcribed verbatim.
+# Every row carries `play`: this is the pool section 6.5 draws the son's fun row from.
+# line-balance-walk and throw-and-catch map to UNKNOWN in section 9, which is `null` here (D-018).
+version: 1
+kind: exercises
+exercises:
+  - id: animal-walk-crab
+    name: Crab walk
+    pattern: locomotion
+    region: full
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: meters
+    equipment: [bodyweight]
+    tags: [play]
+    cue: Hips high off the floor, walk sideways, keep the chest open.
+    garmin_category: TOTAL_BODY
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: distance-progression-carry
+    est_seconds_per_set: 30
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: line-balance-walk
+    name: Balance line walk
+    pattern: locomotion
+    region: full
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: meters
+    equipment: [bodyweight]
+    tags: [play]
+    cue: Heel to toe along the line, arms wide, eyes ahead.
+    garmin_category: null
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: distance-progression-carry
+    est_seconds_per_set: 30
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: jumping-jacks
+    name: Jumping jacks
+    pattern: locomotion
+    region: full
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: [play]
+    cue: Land soft on the whole foot, arms all the way overhead.
+    garmin_category: CARDIO
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: skipping
+    name: Skipping
+    pattern: locomotion
+    region: full
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: meters
+    equipment: [bodyweight]
+    tags: [play]
+    cue: Drive the opposite knee up, stay springy, land quietly.
+    garmin_category: CARDIO
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: distance-progression-carry
+    est_seconds_per_set: 30
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: throw-and-catch
+    name: Throw and catch
+    pattern: locomotion
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: [play]
+    cue: Count the catches, step to meet the ball, soft hands.
+    garmin_category: null
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }

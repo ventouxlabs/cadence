@@ -1,0 +1,63 @@
+# docs/exercise-principles.md section 10.11 - `mobility-carry-day`, adult, 15-min option,
+# day type mobility_carry. This day type has no compound main row (section 6.1), so truncation
+# fills from the secondary pool and always keeps the carry finisher.
+version: 1
+kind: workout
+id: mobility-carry-day
+name: Mobility and carry
+day_type: mobility_carry
+target_profile_kind: adult
+variant: null
+prelude: posture-prelude-v1
+rows:
+  - exercise: hip-90-90-switch
+    role: secondary
+    sets: 2
+    reps: 8
+    per_side: true
+    rest_s: 30
+    load_rule: { mode: bodyweight }
+
+  - exercise: couch-stretch
+    role: secondary
+    sets: 2
+    seconds: 45
+    per_side: true
+    rest_s: 30
+    load_rule: { mode: bodyweight }
+
+  - exercise: farmer-carry
+    role: finisher
+    sets: 3
+    meters: 40
+    rest_s: 120
+    load_rule: { mode: ladder, kg: 16.0 }
+extras:
+  - exercise: suitcase-carry
+    role: secondary
+    sets: 2
+    meters: 30
+    rest_s: 90
+    load_rule: { mode: ladder, kg: 16.0 }
+
+  - exercise: bear-crawl
+    role: secondary
+    sets: 2
+    meters: 15
+    rest_s: 45
+    load_rule: { mode: bodyweight }
+
+  - exercise: open-book
+    role: secondary
+    sets: 2
+    reps: 6
+    per_side: true
+    rest_s: 30
+    load_rule: { mode: bodyweight }
+
+  - exercise: scap-push-up
+    role: secondary
+    sets: 2
+    reps: 10
+    rest_s: 30
+    load_rule: { mode: bodyweight }

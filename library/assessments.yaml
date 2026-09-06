@@ -1,0 +1,171 @@
+# Baseline and retest battery - docs/exercise-principles.md section 7.
+#
+# Four blocks. `tests` parses into PRP-00's `AssessmentSpec`; `adult_tiers` (7.3),
+# `youth_targets` (7.4) and `gap_rows` (7.7) have no PRP-00 model and are parsed by this PRP's
+# own AssessmentLibrary. PRP-07 reads all four; PRP-01 only loads and validates them.
+version: 1
+kind: assessments
+
+tests:
+  - id: push_up_max
+    name: Push-up max
+    unit: reps
+    measure: reps
+    self_rated: false
+    higher_is_better: true
+    protocol:
+      Hands under shoulders, body in one line. Lower until the chest reaches fist height, press
+      up. No time limit. Stop at form breakdown or failure.
+    retest_days: 28
+    youth_cap: 20
+
+  - id: dead_hang_s
+    name: Dead hang
+    unit: s
+    measure: seconds
+    self_rated: false
+    higher_is_better: true
+    protocol:
+      Overhand grip on an overhead anchor, shoulder-width, feet clear of the floor, shoulders
+      active. Time until the grip releases. Requires an overhead anchor.
+    retest_days: 28
+    youth_cap: 90
+
+  - id: plank_s
+    name: Plank
+    unit: s
+    measure: seconds
+    self_rated: false
+    higher_is_better: true
+    protocol:
+      Forearms under shoulders, heels-to-head in one line, ribs down. Time until the hips drop or
+      rise out of line.
+    retest_days: 28
+    youth_cap: 90
+
+  - id: wall_angel_reach
+    name: Wall angel reach
+    unit: score
+    measure: reps
+    self_rated: true
+    higher_is_better: true
+    protocol:
+      "Back flat to a wall, heels ~10 cm out, low back and both wrists in contact. Slide arms
+      overhead as far as contact holds. Self-rate 0-3: 0 wrists or low back leave the wall before
+      the hands pass shoulder height; 1 hands reach forehead height with contact held; 2 hands
+      pass overhead, wrists on the wall, some ribcage flare; 3 full overhead, elbows and wrists on
+      the wall, low back flat, ribs down."
+    retest_days: 28
+    youth_cap: 3
+
+  - id: goblet_squat_quality
+    name: Goblet squat quality
+    unit: score
+    measure: reps
+    self_rated: true
+    higher_is_better: true
+    protocol:
+      "Hold one 8-16 kg implement at the chest. 5 controlled reps, filmed or mirrored. Self-rate
+      the best rep 1-5: 1 heels lift or knees collapse inward, cannot reach parallel; 2 above
+      parallel only, visible knee cave; 3 thighs to parallel, neutral spine, minor knee cave; 4
+      below parallel, neutral spine, no cave, controlled descent; 5 below parallel, upright torso,
+      full control, 3 s pause at the bottom."
+    retest_days: 28
+    youth_cap: 5
+
+  - id: farmer_carry_s
+    name: Farmer carry
+    unit: s
+    measure: seconds
+    self_rated: false
+    higher_is_better: true
+    protocol:
+      Carry 2 x 16 kg (or 2 x 25 percent bodyweight rounded down to the ladder) and walk
+      continuously. Time until the grip fails or the torso side-bends.
+    retest_days: 28
+    youth_cap: 60
+
+# Section 7.3. A measurement below `ok_min` is a gap; `target_value` for an adult challenge is
+# `ok_min`. Ranges are inclusive of the bound named.
+adult_tiers:
+  push_up_max: { low_max: 14, ok_min: 15, ok_max: 30, strong_min: 31 }
+  dead_hang_s: { low_max: 29, ok_min: 30, ok_max: 60, strong_min: 61 }
+  plank_s: { low_max: 59, ok_min: 60, ok_max: 120, strong_min: 121 }
+  wall_angel_reach: { low_max: 1, ok_min: 2, ok_max: 2, strong_min: 3 }
+  goblet_squat_quality: { low_max: 2, ok_min: 3, ok_max: 3, strong_min: 4 }
+  farmer_carry_s: { low_max: 29, ok_min: 30, ok_max: 60, strong_min: 61 }
+
+# Section 7.4. `targets` is the band's "got it" number; `phrasing` is the youth challenge name,
+# which never mentions body, weight or appearance (section 3.5).
+youth_targets:
+  push_up_max:
+    targets: { u10: 8, age_10_13: 12, age_14_17: 20 }
+    cap: 20
+    phrasing: Press up like a plank on the move
+  dead_hang_s:
+    targets: { u10: 20, age_10_13: 30, age_14_17: 40 }
+    cap: 90
+    phrasing: Hang like a monkey
+  plank_s:
+    targets: { u10: 30, age_10_13: 45, age_14_17: 60 }
+    cap: 90
+    phrasing: Hold the bridge steady
+  wall_angel_reach:
+    targets: { u10: 2, age_10_13: 2, age_14_17: 3 }
+    cap: 3
+    phrasing: Make snow angels on the wall
+  goblet_squat_quality:
+    targets: { u10: 3, age_10_13: 3, age_14_17: 4 }
+    cap: 5
+    phrasing: Sit down tall and stand up strong
+  farmer_carry_s:
+    targets: { u10: 20, age_10_13: 30, age_14_17: 40 }
+    cap: 60
+    phrasing: Carry the buckets across the yard
+
+# Section 7.7. `body_comp` inserts no row; it adds one carry set on lower_full_b, which PRP-07
+# applies. `sets` and the measure field describe the inserted row; `_offset` fields are read
+# against the best recorded value for the test.
+gap_rows:
+  dead_hang_s:
+    exercise: dead-hang
+    sets: 3
+    seconds_offset: -10
+    frequency: 2
+    day_types: [upper_a, upper_b]
+  push_up_max:
+    exercise: push-up
+    sets: 3
+    reps_pct: 0.6
+    frequency: 2
+    day_types: [upper_a, upper_b]
+  plank_s:
+    exercise: plank
+    sets: 3
+    seconds_offset: -10
+    frequency: 2
+    day_types: [lower_a, lower_full_b]
+  wall_angel_reach:
+    exercise: wall-angel
+    sets: 2
+    reps: 10
+    frequency: 4
+    day_types: [upper_a, lower_a, upper_b, lower_full_b, mobility_carry, assessment]
+    append_to_prelude: true
+  goblet_squat_quality:
+    exercise: box-squat-bench
+    sets: 3
+    reps: 8
+    frequency: 2
+    day_types: [lower_a, lower_full_b]
+  farmer_carry_s:
+    exercise: farmer-carry
+    sets: 3
+    seconds_offset: -10
+    frequency: 2
+    day_types: [lower_full_b, upper_b]
+  body_comp:
+    exercise: null
+    extra_carry_set: true
+    frequency: 1
+    day_types: [lower_full_b]

@@ -1,0 +1,76 @@
+# docs/exercise-principles.md section 9.5 - Carry. Transcribed verbatim.
+# overhead-carry is adult-only by product decision, not by tag arithmetic alone (section 9.5).
+version: 1
+kind: exercises
+exercises:
+  - id: bear-crawl
+    name: Bear crawl
+    pattern: carry
+    region: full
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: meters
+    equipment: [bodyweight]
+    tags: [play]
+    cue: Knees an inch off the floor, hips low, move opposite limbs.
+    garmin_category: TOTAL_BODY
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: distance-progression-carry
+    est_seconds_per_set: 30
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: suitcase-carry
+    name: Suitcase carry
+    pattern: carry
+    region: full
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: meters
+    equipment: [dumbbells]
+    tags: [loaded_carry, unilateral]
+    cue: One bell only, walk tall, refuse to lean.
+    garmin_category: CARRY
+    garmin_exercise: null
+    regression_of: farmer-carry
+    progression_of: null
+    default_progression: distance-progression-carry
+    est_seconds_per_set: 30
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: farmer-carry
+    name: Farmer carry
+    pattern: carry
+    region: full
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: meters
+    equipment: [dumbbells]
+    tags: [loaded_carry, grip_limited]
+    cue: Shoulders back, short quick steps, crush the handles.
+    garmin_category: CARRY
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: distance-progression-carry
+    est_seconds_per_set: 30
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: overhead-carry
+    name: Overhead carry
+    pattern: carry
+    region: full
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: meters
+    equipment: [dumbbells]
+    tags: [loaded_carry, overhead_loaded]
+    cue: Elbows locked, ribs down, eyes forward, walk slow.
+    garmin_category: CARRY
+    garmin_exercise: null
+    regression_of: null
+    progression_of: farmer-carry
+    default_progression: distance-progression-carry
+    est_seconds_per_set: 30
+    youth_ok_by_band: { u10: "no", age_10_13: "no", age_14_17: "no" }

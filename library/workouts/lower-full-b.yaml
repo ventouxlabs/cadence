@@ -1,0 +1,65 @@
+# docs/exercise-principles.md section 10.5 - `lower-full-b`, adult, day type lower_full_b.
+# The carry appears here every week (section 6.1). Row 1 falls back to db-rdl when no kettlebell
+# is on the ladder.
+version: 1
+kind: workout
+id: lower-full-b
+name: Lower / full B
+day_type: lower_full_b
+target_profile_kind: adult
+variant: null
+prelude: posture-prelude-v1
+rows:
+  - exercise: kb-deadlift
+    role: main
+    sets: 3
+    reps: 10
+    rest_s: 90
+    rpe_target: 8
+    load_rule: { mode: ladder, kg: 24.0, fallback_exercise: db-rdl }
+
+  - exercise: split-squat
+    role: secondary
+    sets: 3
+    reps: 8
+    per_side: true
+    rest_s: 90
+    load_rule: { mode: bodyweight }
+
+  - exercise: step-up-bench
+    role: secondary
+    sets: 3
+    reps: 10
+    per_side: true
+    rest_s: 60
+    load_rule: { mode: bodyweight }
+
+  - exercise: farmer-carry
+    role: secondary
+    sets: 3
+    meters: 30
+    rest_s: 120
+    # "2 x 16 kg or heaviest ladder rung"
+    load_rule: { mode: ladder, kg: 16.0, prefer: heaviest_rung }
+
+  - exercise: half-kneeling-db-antirotation-hold
+    role: finisher
+    sets: 2
+    seconds: 20
+    per_side: true
+    rest_s: 45
+    load_rule: { mode: ladder, pct_of_heaviest: 0.25 }
+extras:
+  - exercise: kb-swing
+    role: secondary
+    sets: 3
+    reps: 12
+    rest_s: 90
+    load_rule: { mode: ladder, kg: 24.0 }
+
+  - exercise: suitcase-carry
+    role: secondary
+    sets: 2
+    meters: 30
+    rest_s: 90
+    load_rule: { mode: ladder, kg: 16.0 }

@@ -1,0 +1,49 @@
+# docs/exercise-principles.md section 10.8 - `son-play-day`, youth, day type mobility_carry.
+# Every row carries `play` and every row is bodyweight, so this workout is legal unchanged at
+# every band: 5 rows <= 5, 2 sets <= 2, no external load, no banned tag. Rep counts above a
+# band's bodyweight ceiling are clamped down at build time (D-063), not rejected.
+version: 1
+kind: workout
+id: son-play-day
+name: Son play day
+day_type: mobility_carry
+target_profile_kind: youth
+variant: play
+prelude: posture-prelude-v1
+rows:
+  - exercise: animal-walk-crab
+    role: main
+    sets: 2
+    meters: 10
+    rest_s: 45
+    load_rule: { mode: bodyweight }
+
+  - exercise: jumping-jacks
+    role: secondary
+    sets: 2
+    reps: 20
+    rest_s: 45
+    load_rule: { mode: bodyweight }
+
+  - exercise: throw-and-catch
+    role: secondary
+    sets: 2
+    reps: 20
+    rest_s: 45
+    cue_override: Count the catches, step to meet the ball, soft hands.
+    load_rule: { mode: bodyweight }
+
+  - exercise: line-balance-walk
+    role: secondary
+    sets: 2
+    meters: 10
+    rest_s: 45
+    load_rule: { mode: bodyweight }
+
+  - exercise: bear-crawl
+    role: finisher
+    sets: 2
+    meters: 10
+    rest_s: 45
+    load_rule: { mode: bodyweight }
+extras: []

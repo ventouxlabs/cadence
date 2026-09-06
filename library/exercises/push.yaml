@@ -1,0 +1,147 @@
+# docs/exercise-principles.md section 9.3 - Push. Transcribed verbatim.
+version: 1
+kind: exercises
+exercises:
+  - id: knee-push-up
+    name: Knee push-up
+    pattern: push_h
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Straight line knees to head, elbows at forty-five degrees.
+    garmin_category: PUSH_UP
+    garmin_exercise: null
+    regression_of: push-up
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: incline-push-up-bench
+    name: Incline push-up on bench
+    pattern: push_h
+    region: upper
+    load_type: bench_assisted
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight, bench]
+    tags: []
+    cue: Hands on the bench, body one plank, chest to the pad.
+    garmin_category: PUSH_UP
+    garmin_exercise: null
+    regression_of: push-up
+    progression_of: null
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: push-up
+    name: Push-up
+    pattern: push_h
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Squeeze glutes, ribs down, chest to fist height.
+    garmin_category: PUSH_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: knee-push-up
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "yes", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: db-floor-press
+    name: DB floor press
+    pattern: push_h
+    region: upper
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells]
+    tags: []
+    cue: Triceps touch the floor, pause, press straight up.
+    garmin_category: BENCH_PRESS
+    garmin_exercise: null
+    regression_of: db-bench-press
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: db-bench-press
+    name: DB bench press
+    pattern: push_h
+    region: upper
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells, bench]
+    tags: []
+    cue: Shoulder blades pinned, wrists stacked, control the descent.
+    garmin_category: BENCH_PRESS
+    garmin_exercise: null
+    regression_of: null
+    progression_of: db-floor-press
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: db-overhead-press
+    name: DB overhead press
+    pattern: push_v
+    region: upper
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells]
+    tags: [overhead_loaded]
+    cue: Ribs down, press to ears, no back arch.
+    garmin_category: SHOULDER_PRESS
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "no", age_14_17: "yes" }
+
+  - id: pike-push-up
+    name: Pike push-up
+    pattern: push_v
+    region: upper
+    load_type: bodyweight
+    load_unit: bodyweight
+    measure: reps
+    equipment: [bodyweight]
+    tags: []
+    cue: Hips high, crown of the head to the floor, elbows forward.
+    garmin_category: PUSH_UP
+    garmin_exercise: null
+    regression_of: null
+    progression_of: db-overhead-press
+    default_progression: rep-progression-bodyweight
+    est_seconds_per_set: 35
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
+
+  - id: db-lateral-raise
+    name: DB lateral raise
+    pattern: push_v
+    region: upper
+    load_type: dumbbell
+    load_unit: per_hand
+    measure: reps
+    equipment: [dumbbells]
+    tags: []
+    cue: Lead with the elbows, stop at shoulder height, no swing.
+    garmin_category: LATERAL_RAISE
+    garmin_exercise: null
+    regression_of: null
+    progression_of: null
+    default_progression: double-progression-loaded
+    est_seconds_per_set: 45
+    youth_ok_by_band: { u10: "no", age_10_13: "yes", age_14_17: "yes" }
