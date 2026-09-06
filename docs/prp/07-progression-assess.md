@@ -42,7 +42,7 @@ Progression state lives in `planned_session.rows_json`. Each row gains, on top o
  "pending_bump": false, "last_outcome": "hold"}
 ```
 
-This is **PRP-00 §4.6's `Progression`** in full, whose field names are principles §5.1's own. One shape serves both lives: PRP-01 seeds it from `library/progressions/default.yaml` and copies it into the row; this PRP rewrites the same field names in place in `rows_json`. Do not fork it. `allow_load_progression` is set false for every youth band, and `cap_load_kg` is injected by the validator from §3.3 via `model_copy(update=...)`, never an in-place set.
+This is **PRP-00 §4.6's `Progression`** in full, whose field names are principles §5.1's own. One shape serves both lives: PRP-01 seeds it from `library/progressions/default.yaml` and copies it into the row; this PRP rewrites the same field names when it writes the next session's `rows_json`. Do not fork it, and do not mutate the loaded row — `apply_outcome` returns a new dict. `allow_load_progression` is set false for every youth band, and `cap_load_kg` is injected by the validator from §3.3 via `model_copy(update=...)`, never an in-place set.
 
 `pending_bump` is set when R1 (deload) suppresses an earned bump; it is consumed by week 1 of the next block (§5.4).
 
