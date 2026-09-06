@@ -9,19 +9,25 @@
 <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="stylesheet" href="/static/style.css">
+{% block head_extra %}{% endblock %}
 <script src="/static/htmx.min.js" defer></script>
 <script src="/static/app.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to today</a>
+{% set tab_base = tab_base|default("/today") %}
+{% set tab_profile = profile_key|default("me") %}
 <header class="topbar">
-  <span class="brand">Cadence</span>
+  {# Today is the landing screen, so the brand goes there and History is the one extra link. #}
+  <a class="brand" href="/today?profile={{ tab_profile }}">Cadence</a>
   <nav class="tabs" aria-label="Profile">
     {% for key, label in PROFILE_TABS %}
-    <a class="tab{% if key == profile_key %} tab-on{% endif %}" href="/today?profile={{ key }}"
+    <a class="tab{% if key == profile_key %} tab-on{% endif %}" href="{{ tab_base }}?profile={{ key }}"
        {% if key == profile_key %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
+  <a class="section{% if tab_base == "/history" %} section-on{% endif %}" href="/history?profile={{ tab_profile }}"
+     {% if tab_base == "/history" %}aria-current="page"{% endif %}>History</a>
 </header>
 <p class="banner" id="offline-banner" hidden>Saved on this phone — will sync.</p>
 <main id="main">

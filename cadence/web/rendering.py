@@ -11,23 +11,15 @@ from typing import Any
 
 from fastapi.templating import Jinja2Templates
 
+# Re-exported: the day names are vocabulary two packages share, so they live beside the enum
+# they name rather than in the module that owns the Jinja environment.
+from cadence.schema.labels import DAY_TYPE_LABELS as DAY_TYPE_LABELS
+from cadence.schema.labels import day_label as day_label
+
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-DAY_TYPE_LABELS: dict[str, str] = {
-    "upper_a": "Upper A",
-    "upper_b": "Upper B",
-    "lower_a": "Lower A",
-    "lower_full_b": "Lower / Full B",
-    "mobility_carry": "Mobility & carry",
-    "assessment": "Assessment day",
-}
-
 PROFILE_TABS: tuple[tuple[str, str], ...] = (("me", "Me"), ("son", "Son"), ("together", "Both"))
-
-
-def day_label(day_type: str) -> str:
-    return DAY_TYPE_LABELS.get(day_type, day_type.replace("_", " ").capitalize())
 
 
 def format_load(value: float | None, unit: str = "kg") -> str:

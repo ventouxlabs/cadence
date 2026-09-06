@@ -1,0 +1,10 @@
+{# The per-exercise rows behind one card. Read-only: nothing here posts. #}
+<ul class="hdetail" data-role="detail" aria-label="Exercises in this session">
+  {% for row in detail.rows %}
+  <li class="hdetail-row">
+    <span class="hdetail-tick" aria-hidden="true">{{ "✓" if row.done else "○" }}</span>
+    <span class="hdetail-name">{{ row.name }}</span>
+    <span class="row-line">{{ row.measure_label }}{% if row.load_kg %} · {{ format_load(row.load_kg, unit|default("kg")) }}{% endif %}</span>
+  </li>
+  {% endfor %}
+</ul>

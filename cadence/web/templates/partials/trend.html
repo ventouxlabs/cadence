@@ -1,0 +1,22 @@
+{# Parent only. The route builds the column with trend=None for a youth profile and on the shared
+   Together tab (D-105), so this file is never reached with anything to leak. #}
+<section class="card trend-card" aria-labelledby="trend-{{ column.profile.id }}">
+  <h2 class="group" id="trend-{{ column.profile.id }}">Body composition · 30 days</h2>
+  {% if column.svg %}
+  {{ column.svg|safe }}
+  {# One key per line actually drawn. A series dropped for having fewer than two points would
+     otherwise keep its legend and show a value with nothing behind it. #}
+  <p class="trend-values">
+    {% if column.trend.has_weight_line %}
+    <span class="trend-value"><span class="trend-key trend-key-weight" aria-hidden="true"></span>weight {{ column.trend.weight_label }}</span>
+    {% endif %}
+    {% if column.trend.has_body_fat_line %}
+    <span class="trend-value"><span class="trend-key trend-key-fat" aria-hidden="true"></span>body fat {{ column.trend.body_fat_label }}</span>
+    {% endif %}
+  </p>
+  {% set note = column.trend.stale_note() %}
+  {% if note %}<p class="trend-stale">{{ note }}</p>{% endif %}
+  {% else %}
+  <p class="trend-empty">No data yet.</p>
+  {% endif %}
+</section>

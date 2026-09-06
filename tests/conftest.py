@@ -7,7 +7,9 @@ connections against the same file.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Iterator
+import os
+import time
+from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 
 import httpx
@@ -44,6 +46,25 @@ YOUTH_RULES_PATH = LIBRARY_PATH / "youth_rules.yaml"
 @pytest.fixture
 def db_path(tmp_path: Path) -> Path:
     return tmp_path / "cadence.db"
+
+
+@pytest.fixture
+def tz() -> Iterator[Callable[[str], None]]:
+    """Set the process time zone for one test and put it back afterwards.
+
+    ``monkeypatch.setenv("TZ", ...)`` alone is not enough: it restores the variable at teardown
+    but never re-runs ``tzset()``, so the C-level zone stays whatever the last test chose for
+    every test after it in the process. Every zone-sensitive assertion downstream then depends on
+    collection order. This fixture owns both halves.
+    """
+
+    def _set(name: str) -> None:
+        os.environ["TZ"] = name
+        time.tzset()
+
+    yield _set
+    os.environ.pop("TZ", None)
+    time.tzset()
 
 
 @pytest.fixture

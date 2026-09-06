@@ -8,12 +8,16 @@ workstation and 8090 is the ``make dev`` default, so neither is hard-coded here)
 
 from __future__ import annotations
 
+import json
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
+import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -143,3 +147,89 @@ def fresh_session(api: httpx.Client):
         raise AssertionError(f"could not clear the open session for {profile!r}")
 
     return _fresh
+
+
+# ------------------------------------------------------------------ the History seed (PRP-04)
+#
+# Here rather than in a test module because it is session-scoped and two modules use it: pytest
+# treats a session fixture imported into a second module as a second fixture and runs the whole
+# setup twice, which collides on the planned rows the first copy already wrote.
+
+# The nav floor. Lower than a checklist row's, because these are chrome rather than the work.
+MIN_NAV_PX = 44
+EXTRA_SESSIONS = 2
+SYNTHETIC_WEEK = 9
+ROWS = 5
+
+
+def _rows_json() -> str:
+    return json.dumps(
+        [
+            {"position": index, "exercise_id": "goblet-squat", "name": "Goblet squat", "reps": 8, "sets": 3}
+            for index in range(1, ROWS + 1)
+        ]
+    )
+
+
+def _write_session(db: sqlite3.Connection, profile_id: str, day_index: int, finished_at: str) -> None:
+    """One finished session over a planned row Today will never surface."""
+    planned_id = f"e2e-{profile_id}-{day_index}"
+    session_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO planned_session (id, program_id, profile_id, week, day_index, day_type, workout_id,"
+        " rows_json, status) VALUES (?, ?, ?, ?, ?, 'upper_a', 'upper-a', ?, 'done')",
+        (planned_id, f"e2e-{profile_id}", profile_id, SYNTHETIC_WEEK, day_index, _rows_json()),
+    )
+    db.execute(
+        "INSERT INTO session (id, profile_id, planned_session_id, started_at, finished_at, duration_min, felt)"
+        " VALUES (?, ?, ?, ?, ?, 26, 'right')",
+        (session_id, profile_id, planned_id, finished_at, finished_at),
+    )
+    for position in range(1, ROWS + 1):
+        db.execute(
+            "INSERT INTO session_row (id, session_id, position, exercise_id, done, done_at, is_challenge)"
+            " VALUES (?, ?, ?, 'goblet-squat', 1, ?, 0)",
+            (f"{session_id}-{position}", session_id, position, finished_at),
+        )
+
+
+@pytest.fixture(scope="session")
+def history_seed(server_db: Path, base_url: str) -> dict[str, str]:
+    """One real Done through PRP-02's routes, two written rows, and two cached trend points."""
+    with httpx.Client(base_url=base_url, timeout=10.0) as api:
+        data = api.get("/api/today?profile=me").json()["data"]
+        session_id = data["session_id"]
+        for row in data["rows"]:
+            api.post(f"/api/sessions/{session_id}/rows/{row['position']}", json={"done": True})
+        assert api.post(f"/api/sessions/{session_id}/done", json={"felt": "right"}).status_code == 200
+
+    now = datetime.now(UTC)
+    today = now.astimezone().date()
+    db = sqlite3.connect(server_db, timeout=10)
+    try:
+        for index in range(EXTRA_SESSIONS):
+            _write_session(db, "me", index + 1, (now - timedelta(minutes=index + 1)).isoformat())
+        db.execute(
+            "INSERT OR REPLACE INTO metrics_cache (profile_id, fetched_at, payload_json, stale) VALUES ('me', ?, ?, 0)",
+            (
+                now.isoformat(),
+                json.dumps(
+                    {
+                        "weight_kg": [
+                            [(today - timedelta(days=28)).isoformat(), 85.2],
+                            [(today - timedelta(days=14)).isoformat(), 84.6],
+                            [today.isoformat(), 84.1],
+                        ],
+                        "body_fat_pct": [
+                            [(today - timedelta(days=28)).isoformat(), 19.1],
+                            [(today - timedelta(days=14)).isoformat(), 18.6],
+                            [today.isoformat(), 18.2],
+                        ],
+                    }
+                ),
+            ),
+        )
+        db.commit()
+    finally:
+        db.close()
+    return {"session_id": session_id}

@@ -160,3 +160,36 @@ async def test_the_parents_done_never_says_good_enough(seeded_client: httpx.Asyn
 
     assert "Good enough" not in page
     assert 'class="done' in page
+
+
+# ------------------------------------------------------------- D-027 on the History screen
+
+
+async def test_the_sons_history_carries_no_banned_language(seeded_client: httpx.AsyncClient) -> None:
+    """PRP-04 acceptance test 23, run over the DOM rather than over the helpers behind it.
+
+    The son's History is the screen most likely to grow a body metric by accident: the parent's
+    version of the same page carries a weight-and-body-fat sparkline, and one forgotten
+    ``profile.kind`` check is all it would take.
+    """
+    data = await _son(seeded_client)
+    for row in data["rows"][:3]:
+        await seeded_client.post(f"/api/sessions/{data['session_id']}/rows/{row['position']}", json={"done": True})
+    await seeded_client.post(f"/api/sessions/{data['session_id']}/done", json={"felt": "easy"})
+
+    page = await seeded_client.get("/history?profile=son")
+    assert page.status_code == 200
+    _assert_clean(page.text, "the son's History")
+
+    expanded = await seeded_client.get(f"/history?profile=son&open={data['session_id']}")
+    assert 'data-role="detail"' in expanded.text
+    _assert_clean(expanded.text, "the son's History with a session open")
+
+
+async def test_the_sons_history_shows_no_trend_line(seeded_client: httpx.AsyncClient) -> None:
+    """The sparkline is the parent's, on the parent's tab, and nowhere else."""
+    for path in ("/history?profile=son", "/history?profile=together"):
+        page = await seeded_client.get(path)
+        assert page.status_code == 200
+        assert 'data-role="trend"' not in page.text, path
+        assert "<polyline" not in page.text, path

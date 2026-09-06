@@ -12,11 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 
 from cadence.api import health, sessions
+from cadence.api import history as api_history
 from cadence.api import today as api_today
 from cadence.api.envelope import err
 from cadence.config import Settings, get_settings
 from cadence.db import init_db
 from cadence.web.rendering import STATIC_DIR
+from cadence.web.routers import history as web_history
 from cadence.web.routers import pwa
 from cadence.web.routers import today as web_today
 
@@ -25,7 +27,9 @@ ROUTERS: list[APIRouter] = [
     health.router,
     api_today.router,
     sessions.router,
+    api_history.router,
     web_today.router,
+    web_history.router,
     pwa.router,
 ]
 

@@ -45,6 +45,21 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 - PWA: manifest, icons, service worker (network-first Today with cache fallback, precached offline Done page), IndexedDB queue for tick/adjust/felt/done with in-flight marking and 4xx parking; HTMX 2.0.10 vendored; GZip; cold `/today` 27.6 KB gzip of 60 KB.
 - 1087 tests, 45 Playwright tests at 390×844 (and 1024×768), 94% coverage.
 
+### prp-04 — history-scorecard (2026-09-06)
+- History screen at `GET /history?profile=me|son|together`: weekly scorecard (done vs `days_per_week`, one dot per session, streak and best), the finished-session list with date, day name, N of M, duration, how it felt and a sync badge, and cards that expand in place to the per-exercise rows (HTMX, and an ordinary link with JavaScript off).
+- Streak defined in exactly one place (`cadence/historique/scorecard.py`): consecutive completed planned sessions in program order, held by a partial, reset by a skip, ended by the first still-planned row, counted once per profile for a Together session.
+- Parent-only inline SVG sparkline of the last 30 days of weight and body fat from `metrics_cache`, two polylines on a shared date axis, hidden below two points and never rendered for the son or on the shared Together tab (D-105).
+- `GET /api/sessions?profile=&limit=` (1–200, else 422) and `GET /api/scorecard?profile=`; the `trend` key is absent, not null, for a youth profile.
+- `metrics_cache` table created empty with the payload contract PRP-06 fills (D-101); `sync_job` read only when it exists, otherwise every badge reads "Stored locally".
+- History link added to the base nav; Today stays the landing screen. `history.css` loads only on `/history`, so Today keeps its 60 KB budget.
+- 1153 tests, 52 Playwright tests at 390×844, 94% coverage. Decisions D-100 to D-106.
+
+### prp-04 — history-scorecard (2026-09-06)
+- `/history?profile=` with completed sessions (date, day type, N/M rows, felt, duration, sync badge), expand-in-place session detail scoped to the profile, weekly scorecard (done vs planned, current and best streak), Together counted once per profile.
+- Body-composition sparkline (weight kg + body-fat %) for the adult profile only, from `metrics_cache` (table created here, filled by PRP-06); youth history shows fun stats only, no trend, no banned words.
+- `GET /api/sessions`, `GET /api/scorecard`; `cadence/historique/` domain package with no web-layer imports; day labels in `cadence/schema/labels.py`.
+- 1277 tests, 58 Playwright, 94% coverage.
+
 ### prp-05 — vitalforge-activity (2026-09-06) — branch `cadence/activity-endpoint` in ../vitalforge, not pushed
 - `POST /p/{slug}/api/activity` (202 fresh / 200 dedup / 409 cross-person / 422), `GET /p/{slug}/api/activity/{session_id}`, `GET /p/{slug}/api/strength-sessions`.
 - `strength_sessions` table with `UNIQUE(person_id, session_id)`; push claimed inside `BEGIN IMMEDIATE` (`garmin_claimed_at`, 600 s lease); statuses pending/synced/failed/skipped/unknown; reconciliation by lookup for ambiguous outcomes; session marker in the Garmin activity name.

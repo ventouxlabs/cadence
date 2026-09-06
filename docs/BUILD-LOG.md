@@ -36,3 +36,10 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Reviewer: 2 Highs (writes on a finished session materialised the next one; Together Done ignored the son's checklist) + 5 Mediums fixed and re-verified APPROVE; follow-up batch fixed felt scoping, per-session promotion, footer occlusion, atomic patch.
 - Implementer hit the account session limit on the last two items; orchestrator verified the uncommitted work (lint, 1087 pytest, 45 e2e green) and committed it.
 - Squash-merged to main, tagged prp-02, pushed. D-070..D-084.
+
+## prp-04 — history-scorecard — 2026-09-06 (worktree, parallel with PRP-03)
+- Implementer built historique package, history routes/templates, sparkline, metrics_cache table (1153 tests, 52 e2e).
+- Tester added 118 unit + 6 e2e (streak sequences, frozen clock, guards, tablet); fixed cross-profile session detail leak and a TZ fixture leak.
+- Reviewer: no Highs; 4 Mediums (unscoped detail route, two definitions of "finished", domain importing web layer, swallowed errors) + 3 Lows fixed (D-107).
+- Final: 1277 passed, 58 e2e, 94% coverage, lint clean.
+- Squash-merged to main, tagged prp-04, pushed.

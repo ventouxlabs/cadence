@@ -1,0 +1,14 @@
+{# This week against the plan, plus the streak. "Streak 7", never "7 days": the plan is a queue,
+   not a calendar (D-011), so a rest day must not read as a broken streak. #}
+<section class="card scorecard" aria-labelledby="week-{{ column.profile.id }}">
+  <h2 class="group" id="week-{{ column.profile.id }}">This week</h2>
+  <p class="score-head" data-role="score">{{ column.scorecard.headline }} sessions</p>
+  <p class="dots" aria-hidden="true">
+    {% for filled in column.scorecard.dots %}<span class="dot{% if filled %} dot-on{% endif %}"></span>{% endfor %}
+  </p>
+  <p class="summary-line" data-role="streak">Streak {{ column.scorecard.current_streak }} · Best {{ column.scorecard.best_streak }}</p>
+  {% if column.is_youth %}
+  <p class="summary-line" data-role="ticked">{{ column.scorecard.total_rows_ticked }} exercises ticked all-time</p>
+  <p class="summary-line" data-role="total">{{ column.scorecard.total_sessions }} sessions all-time</p>
+  {% endif %}
+</section>

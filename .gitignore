@@ -35,3 +35,7 @@ data/
 
 # Screenshots from the end-to-end suite
 .shots/
+
+# coverage shards
+.coverage.*
+.shots/

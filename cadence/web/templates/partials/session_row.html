@@ -1,0 +1,19 @@
+{# One finished session. The control is an anchor so it still works with JavaScript off: HTMX
+   swaps the card in place, and a plain browser follows the link to /history?open=<id>, which
+   renders the same card expanded. History never writes anything. #}
+{% set target = "/history/sessions/" ~ item.id ~ "?profile=" ~ profile_key ~ "&expand=" ~ ("0" if expanded else "1") %}
+<article class="card hcard{% if expanded %} hcard-open{% endif %}" id="hs-{{ item.id }}" data-role="session">
+  <a class="hcard-tap" href="{{ target }}" hx-get="{{ target }}" hx-target="#hs-{{ item.id }}" hx-swap="outerHTML"
+     aria-expanded="{{ "true" if expanded else "false" }}" aria-controls="hs-{{ item.id }}">
+    <span class="hcard-head">
+      <span class="hcard-date">{{ item.date_label }}</span>
+      <span class="hcard-day">{{ item.day_name }}</span>
+      {% if item.together %}<span class="hcard-tag">together</span>{% endif %}
+    </span>
+    <span class="summary-line">{{ item.counts }} · {{ item.duration_min }} min{% if item.felt_label %} · {{ item.felt_label }}{% endif %}</span>
+    <span class="hcard-sync" data-role="sync" title="{{ item.sync_label }}"><span aria-hidden="true">{{ item.sync_glyph }}</span><span class="visually-hidden">{{ item.sync_label }}</span></span>
+  </a>
+  {% if expanded and detail %}
+  {% include "partials/session_detail.html" %}
+  {% endif %}
+</article>

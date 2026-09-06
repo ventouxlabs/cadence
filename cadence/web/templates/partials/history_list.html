@@ -1,0 +1,11 @@
+<h2 class="group">Sessions</h2>
+{% if column.sessions %}
+{% for item in column.sessions %}
+  {% set expanded = (open_id == item.id) %}
+  {% with detail = open_detail if expanded else None %}
+  {% include "partials/session_row.html" %}
+  {% endwith %}
+{% endfor %}
+{% else %}
+<p class="notice">No sessions yet. The first one lands here as soon as it is done.</p>
+{% endif %}

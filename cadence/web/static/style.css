@@ -342,3 +342,39 @@ body {
 }
 
 .exit-promoted { background: var(--go); color: var(--go-ink); font-size: 19px; min-height: 64px; }
+
+/* ------------------------------------------------------- nav additions (PRP-04) */
+
+/* A link, so it carries a tap target: 73x24 px is a miss on a phone held one-handed. */
+a.brand {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-right: 4px;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+/* The one section link beside the profile tabs. Today is the landing screen, so it is the
+   brand's href and this is the way across to History and back. */
+.section {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.section-on { background: var(--accent-ink); color: var(--accent); font-weight: 600; }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

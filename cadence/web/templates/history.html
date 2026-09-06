@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}History · Cadence{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/static/history.css">{% endblock %}
+{% block content %}
+{% if view.missing %}
+<p class="notice">No profile named {{ view.missing|join(" and ") }}.</p>
+{% endif %}
+<div class="columns{% if view.together %} columns-two{% endif %}">
+  {% for column in view.columns %}
+  <section class="hcolumn" data-profile="{{ column.profile.id }}">
+    {% if view.together %}<h1 class="hname">{{ column.profile.display_name }}</h1>{% endif %}
+    {% include "partials/scorecard.html" %}
+    {# No trend card on the Together tab either: the son is at the same phone (D-105). #}
+    {% if column.is_youth or view.together %}
+      {% include "partials/badges.html" %}
+      {% include "partials/history_list.html" %}
+    {% else %}
+      {% include "partials/trend.html" %}
+      {% include "partials/history_list.html" %}
+      {% include "partials/badges.html" %}
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}
