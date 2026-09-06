@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+htmlcov/
+.coverage
+coverage.xml
+
+# Secrets & local data
+.env
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/backups/
+
+# Node / Playwright
+node_modules/
+test-results/
+playwright-report/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# OMC state
+.omc/
