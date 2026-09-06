@@ -59,7 +59,7 @@ Failure — always 422, never 500, and always the full list:
    {"code": "youth_rep_floor", "row": 3, "message": "Loaded rows need at least 8 reps at age band age_10_13."}]}}
 ```
 
-Error codes come from two places and must not be invented twice. **Pipeline codes**, owned here, cover the gates before the validator: `parse_error`, `not_a_mapping`, `too_large`, `too_many_exercises`, `string_too_long`, `suspicious_content`, `id_collision`, `youth_exercise_not_allowed`, `validation_failed`. **Validator codes** pass through verbatim from PRP-00's `codes.py` — `schema`, `unknown_exercise`, `equipment_not_whitelisted`, `equipment_not_available`, `measure_mismatch`, `measure_conflict`, `youth_load_type_not_allowed`, `youth_load_exceeded`, `youth_rep_floor`, `youth_rest_floor`, `youth_exercise_count`, `youth_set_count`, `youth_banned_tag`, `youth_session_length`, `youth_amrap_not_allowed`, `youth_banned_goal`, `requires_anchor_unavailable`. Never remap or rename one.
+Error codes come from two places and must not be invented twice. **Pipeline codes**, owned here, cover the gates before the validator: `parse_error`, `not_a_mapping`, `too_large`, `too_many_exercises`, `string_too_long`, `suspicious_content`, `id_collision`, `validation_failed`. **Validator codes** pass through verbatim from PRP-00's `codes.py` — `schema`, `unknown_exercise`, `equipment_not_whitelisted`, `equipment_not_available`, `measure_mismatch`, `measure_conflict`, `youth_load_type_not_allowed`, `youth_load_exceeded`, `youth_rep_floor`, `youth_rest_floor`, `youth_exercise_count`, `youth_set_count`, `youth_banned_tag`, `youth_session_length`, `youth_amrap_not_allowed`, `youth_banned_goal`, `requires_anchor_unavailable`, `youth_exercise_not_allowed` (V14, the §9 per-band allowlist). Never remap or rename one.
 
 Rules:
 
@@ -180,7 +180,7 @@ Partials owned here: `partials/import_result.html`, `partials/generate_preview.h
 ## Implementation notes
 
 - Files: `cadence/api/import_.py`, `cadence/api/generate.py`, `cadence/bibliotheque/import_service.py`, `cadence/ia/{client.py,generate.py,prompts/generate.md}`, `cadence/web/routers/settings_ai.py`, the four partials.
-- **The §9 youth allowlist is not enforced by the validator.** PRP-00's `Exercise` has no allowlist field and `codes.py` has no code for it, so a document naming `kb-swing` for a 10-year-old passes `validate_workout` on the load-type rule alone only if the band allows kettlebells. Both `/api/import` and `/api/generate/accept` must additionally call PRP-01's `youth_allows(exercise_id, band, bodyweight_kg)` for every row of a youth-targeted document and reject with `youth_exercise_not_allowed` (a pipeline code owned here) when it returns False.
+- **The §9 per-band allowlist rides inside the validator** as V14 (PRP-00 §5.3), so both write paths get it for free from `validate_workout` — do not add a second check here. Two behaviours to pass `bodyweight_kg` for correctly: a band absent from an exercise's `youth_ok_by_band` is denied, and a `conditional` exercise is denied outright when `bodyweight_kg is None`. So `/api/import` and `/api/generate/accept` must pass the target profile's real `bodyweight_kg` and `has_overhead_anchor` into the call, not the defaults.
 - **Validator call.** `validate_workout(doc, *, profile_kind, age_band, equipment, bodyweight_kg, has_overhead_anchor, exercises, youth_rules)` returns a frozen `ValidationResult(ok, errors)` (PRP-00). **Gate on `result.ok`.** The result is a Pydantic model and always truthy, and `youth_rep_ceiling` / `youth_rpe_exceeded` are warnings a valid document may carry — rejecting on a non-empty `errors` list would reject good workouts. Surface warnings in `data.warnings` on a successful import.
 - **Jinja autoescape must be on** for every template that renders imported or generated text. Assert it in a test rather than trusting the default. Never use `|safe` on a `name`, `cue` or `notes` field. Never build HTML in Python from imported text.
 - **Order of operations on import**: size → suspicious-content scan on raw text → `safe_load` → single-document check → mapping check → depth and count caps → string length caps → drop unknown top-level keys → schema parse → inline exercise validation → `validate_workout` → store. Fail at the first gate that trips, but return **all** validator errors when reaching that stage.
@@ -199,7 +199,7 @@ Partials owned here: `partials/import_result.html`, `partials/generate_preview.h
 4. **Negative** `test_import_youth_five_rep_sets_rejected` — a loaded 3×5 workout targeting `son` at `age_10_13` → 422, code `youth_rep_floor`.
 4b. `test_warning_codes_do_not_reject` — a document whose only issue is `youth_rep_ceiling` imports successfully and the warning appears in `data.warnings`.
 5. **Negative** `test_import_youth_kettlebell_rejected` — a kettlebell row targeting `son` at `age_10_13` → 422 `youth_load_type_not_allowed`.
-5b. **Negative** `test_import_youth_allowlist_enforced` — `kb-swing` targeting `son` at `age_14_17` with `bodyweight_kg=40` → 422 `youth_exercise_not_allowed`, proving the check that the validator does not make.
+5b. **Negative** `test_import_youth_allowlist_enforced` — `kb-swing` targeting `son` at `age_14_17` with `bodyweight_kg=40` → 422 `youth_exercise_not_allowed` (V14); the same document with `bodyweight_kg=None` is also rejected, proving the route passes the real bodyweight through.
 6. **Negative** `test_import_malformed_text` — `"::: not yaml"` → 422 code `parse_error`, no traceback in the body.
 7. **Negative** `test_import_multi_document` — two documents separated by `---` → 422 `parse_error`.
 8. **Negative** `test_import_too_large` — 300 KB body → 422 `too_large`, and the parser is never reached (assert with a spy).
@@ -244,7 +244,7 @@ Partials owned here: `partials/import_result.html`, `partials/generate_preview.h
 7. **A generated workout overwriting a seed id.** Mitigation: test 17 for import, same guard for generate.
 8. **Path traversal on the multipart filename.** Mitigation: the filename is read and discarded; the service takes a string; test 18.
 9. **Secrets in logs.** A debug `logger.info(response.text)` leaks the prompt and possibly the key on an auth error. Mitigation: log model, attempts and latency only; a test asserts `Bearer` never appears in captured log records.
-10. **The §9 allowlist gap.** A reviewer reading only PRP-00 will assume `validate_workout` covers it; it does not. Mitigation: the explicit `youth_allows` call in both write paths and test 5b, which fails if the call is dropped.
+10. **Calling the validator with default `bodyweight_kg` / `has_overhead_anchor`.** Both default in the signature, so an incomplete call compiles and silently weakens V2, V13 and V14 — a `conditional` kettlebell row would be judged on the absolute cap alone. Mitigation: test 5b's second half, which rejects the same document under an unknown bodyweight.
 11. **Youth validation run against the wrong profile.** Defaulting `profile` to `me` while the UI targets `son` would let a barbell workout onto the kid's plan. Mitigation: the target profile select is required in the UI, the API default is `me`, and tests 4, 5 and 23 all pass an explicit `son`.
 12. **A 60 s hang blocking the event loop.** Mitigation: `httpx.AsyncClient`, awaited, with the timeout above; never `requests`.
 13. **Unbounded retry** on a flapping gateway. Mitigation: exactly one retry, test 26.
@@ -258,4 +258,4 @@ Partials owned here: `partials/import_result.html`, `partials/generate_preview.h
 - [ ] The outgoing prompt carries the band and never the age, name, slug, metric, log or token — proven by an assertion on the captured request.
 - [ ] Imported and generated text renders escaped everywhere.
 - [ ] Import and Generate sections work inside PRP-03's Settings containers.
-- [ ] All 40 acceptance tests pass; `make lint && make test && make e2e` green; the Codex adversarial review has no unresolved Highs.
+- [ ] All 39 acceptance tests pass; `make lint && make test && make e2e` green; the Codex adversarial review has no unresolved Highs.

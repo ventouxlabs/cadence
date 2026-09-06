@@ -65,7 +65,7 @@ library/assessments.yaml
 
 ### Exercise document
 
-Field names and constraints are **PRP-00 §4.3's `Exercise` model**, which is `extra="forbid"` and frozen. Two keys below are template-layer only and are stripped before the model is constructed — see the note after the example.
+Field names and constraints are **PRP-00 §4.3's `Exercise` model**, which is `extra="forbid"` and frozen. Every key below is a real model field.
 
 ```yaml
 version: 1
@@ -87,14 +87,13 @@ exercises:
     progression_of: null             # exercise id or null
     default_progression: dbl-prog-loaded-compound   # id into progressions/default.yaml
     est_seconds_per_set: 45
-    # --- template layer, stripped before building the Exercise model ---
-    youth_ok:                        # §9 allowlist; yes | no | conditional
+    youth_ok_by_band:                # §9 allowlist; YouthAllow = yes | no | conditional (Y / N / Y*)
       u10: no
       age_10_13: yes
       age_14_17: yes
 ```
 
-> **`youth_ok` has no home in PRP-00's schema.** `Exercise` is `extra="forbid"` and has no allowlist field, and `codes.py` has no allowlist code, so §9's per-band columns are currently unenforceable by the validator. Resolution, needing no change to PRP-00: the loader pops `youth_ok` before constructing `Exercise`, keeps it on `LibraryBundle.youth_ok: dict[str, dict[AgeBand, YouthOk]]`, and exposes `youth_allows(exercise_id, band) -> bool`. The program engine filters on it, and **PRP-08's import and generate paths must call it too**, since the validator will not. Report this gap; if PRP-00 later adds the field and a `youth_exercise_not_allowed` code, move the check there and delete the helper.
+> **`youth_ok_by_band` is enforced by the validator as V14** (PRP-00 §5.3), not by this PRP. Three semantics the seed author must respect. A band **omitted** from the dict is denied — fail closed — so every exercise must list all three youth bands explicitly, even the all-`no` ones. `conditional` (§9's `Y*`) is denied whenever `bodyweight_kg is None`, which is the one place the absolute-cap fallback must not rescue a row (§3.6). And V14 applies only to youth profiles; `adult` is not a column in §9 and adult profiles are exempt. The program engine still filters the selection pool by the same field, so an illegal exercise is never offered rather than merely rejected.
 
 `conditional` means §3.6: legal only two-handed at 16 kg with `bodyweight_kg >= 45.7`. `Y*` in §9 → `conditional`. Every `UNKNOWN` in §9 → `garmin_category: null` (D-018).
 
@@ -149,18 +148,11 @@ The §3.2 table verbatim, one mapping per band key (`u10`, `age_10_13`, `age_14_
 
 ### `library/progressions/default.yaml`
 
-A list of named `Progression` documents parsed by **PRP-00 §4.6's model**, whose field names differ from principles §5.1. Map them:
+A list of named `Progression` documents parsed by **PRP-00 §4.6's model**, which is field-for-field principles §5.1 plus an `id` slug (the library file needs a key). Field names are principles' own — `rep_min`/`rep_max`, `regress_on` — and the defaults are already right: `regress_step` 0.10, `regress_reps` 2, `deload_pct` 0.60, `allow_load_progression` true.
 
-| principles §5.1 | PRP-00 `Progression` |
-|---|---|
-| `rep_min` / `rep_max` | `rep_low` / `rep_high` |
-| `regress_on` | `regress_triggers` |
-| `load_step_kg`, `time_step_s`, `type`, `deload_pct` | same names |
-| `regress_step`, `regress_reps`, `load_step_pct`, `distance_step_m`, `allow_load_progression`, `cap_load_kg` | **not on the model** |
+One shape serves two lives: the default stored on a seed exercise via `default_progression`, and the per-row mutable state copied into `rows_json` by `materialise_rows`, where PRP-07 rewrites the same field names. Do not fork it into two models.
 
-The six unmodelled fields are runtime state, not library data: `allow_load_progression` is derived from the band (false for every youth band), `cap_load_kg` from `effective_cap`, and the rest carry principles' defaults (`regress_step` 0.10, `regress_reps` 2) as module constants in `cadence/programme/`. All six are written into `rows_json` by `materialise_rows`, where PRP-07 reads them.
-
-**`deload_pct` must be set explicitly to `0.60` in every document.** PRP-00's model default is 0.4; principles §5.5 says 0.60, and the two differ materially for carry distance. Do not rely on the default.
+Seed one document per §5.2 default: `type` `double_progression` for reps + external load, `rep_progression` for reps + bodyweight, `time_progression` for seconds, and `time_progression` with `distance_step_m` for meters and steps. Set `allow_load_progression: false` on nothing here — it is set per row from the band (§5.6), and `cap_load_kg` is injected by the validator (§3.3).
 
 ### `library/assessments.yaml`
 
@@ -171,13 +163,11 @@ One document with four blocks. `tests:` is a list of **PRP-00 §4.8 `AssessmentS
 ```python
 # cadence/bibliotheque/loader.py
 def load_library(path: Path = Path("library")) -> LibraryBundle: ...
-# LibraryBundle: exercises: dict[str, Exercise]          (PRP-00 model)
-#                youth_ok:  dict[str, dict[AgeBand, YouthOk]]
+# LibraryBundle: exercises: dict[str, Exercise]          (PRP-00 model, carries youth_ok_by_band)
 #                templates: dict[str, WorkoutTemplate]   (this PRP's model)
 #                youth_rules: dict[AgeBand, YouthRuleSet]
 #                progressions: dict[str, Progression]    (PRP-00 model)
 #                assessments: AssessmentLibrary
-def youth_allows(bundle, exercise_id: str, band: AgeBand, bodyweight_kg: float | None) -> bool: ...
 
 # cadence/bibliotheque/seed.py
 def seed(session, path: Path = Path("library"), reset: bool = False) -> SeedReport: ...
@@ -241,12 +231,13 @@ def compile_workout(template, week, profile, settings, library) -> Workout: ... 
 6. **Negative** `test_adult_workouts_fail_youth_validation` — `upper-a`, `lower-a`, `lower-full-b`, `mobility-carry-day` each return `ok is False` at `u10`, carrying `youth_load_type_not_allowed` or `youth_banned_tag` (§3.2/§3.4).
 7. **Negative** `test_unknown_garmin_category_rejected` — `garmin_category: BARBELL` fails to load, and so does `garmin_category: UNKNOWN` (no such member, D-018).
 7b. **Negative** `test_template_key_rejected_on_concrete_model` — feeding a raw template row to PRP-00's `WorkoutRow` fails with `extra="forbid"`, proving the two layers are distinct.
-7c. `test_youth_allows_helper` — `youth_allows("kb-swing", "age_10_13", None)` is False; at `age_14_17` with `bodyweight_kg=50` True, with 40 or None False.
+7c. `test_seed_lists_all_three_youth_bands` — every seed exercise's `youth_ok_by_band` has keys for `u10`, `age_10_13` and `age_14_17`, so V14's fail-closed default never fires by accident.
+7d. `test_conditional_marks_the_two_kettlebells` — `kb-deadlift`, `kb-swing` and `kb-row` are `conditional` at `age_14_17` and `no` below; nothing else in the library is `conditional`.
 8. **Negative** `test_missing_link_target_aborts_load` — a doc with `regression_of: no-such-exercise` aborts the whole load and seeds nothing.
 9. `test_program_4day_30min_has_16_sessions` — `days_per_week=4`, `session_minutes=30` → 16 planned sessions; each `rows_json[0].role == "prelude"`; the first session of week 1 has `day_type == "assessment"`.
 10. `test_30min_session_has_five_rows_excluding_prelude` — and 15 min → 3, 45 min → 7 (§6.4).
 11. `test_days_per_week_mapping` — 2 → `[upper_a, lower_full_b]`; 3 across two weeks → `[upper_a, lower_a, upper_b]` then `[lower_full_b, upper_a, lower_a]`; 5 adds `mobility_carry`, which resolves to `mobility-carry-day` for `me` and `son-play-day` for `son`; 6 repeats `upper_a` for `me` and gives `son` a second `son-play-day`.
-12. `test_deload_week_reduces_sets` — every week-4 row has `sets == max(2, floor(sets_w3 * 0.60))` and `reps == rep_low`, load unchanged (§5.5).
+12. `test_deload_week_reduces_sets` — every week-4 row has `sets == max(2, floor(sets_w3 * 0.60))` and `reps == rep_min`, load unchanged (§5.5).
 13. `test_week_schemes` — week 1/2/3 reps for a `main` row are 8/10/8 with 3/3/4 sets, and a template week-1 override wins (P7: `upper-a` `plank` is 40 s in week 1, 50 s in week 2).
 14. `test_load_rounding_cases` — parametrised: target 20.0 on the household DB ladder → 19.28; target 1.0 → 2.27 when uncapped; target 20.0 with `cap=5.0` → 4.54; `cap=1.0` → `None`; discrete KB ladder target 20.0 → 16.0.
 15. `test_weights_available_parser` — `"DB 5-52.5 lb adj step 2.5"` → adjustable 2.27–23.81 kg step 1.13; `"KB 16/24 kg"` → `{16.0, 24.0}`; `"BENCH adjustable"` → bench present; `"DB 2-10 kg"` → step 1.0.
