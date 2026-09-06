@@ -44,7 +44,9 @@ Architecture §3 is authoritative for columns. Additions this PRP makes, each ne
 | `profile` | `has_overhead_anchor BOOLEAN NOT NULL DEFAULT 0` | D-019, §1.7 anchor filtering |
 | `profile` | `age_band TEXT NOT NULL DEFAULT 'u10'` | denormalised cache of `age_band()`, recomputed on write |
 
-Table classes live in the domain module that owns them: `profile`/`setting` in `cadence/profils/tables.py`, `exercise`/`workout` in `cadence/bibliotheque/tables.py`, `program`/`planned_session` in `cadence/programme/tables.py`. All are imported by `cadence/db.py::init_db()` so `SQLModel.metadata` sees them.
+`exercise` and `workout` are **created by PRP-00**; this PRP only fills them. New here: `profile` and `setting` in `cadence/profils/tables.py`, `program` and `planned_session` in `cadence/programme/tables.py`. All are imported by `cadence/db.py::init_db()` so `SQLModel.metadata` sees them.
+
+> **Seam correction.** PRP-00's deferral table assigns `profile` / `setting` and age-band derivation to PRP-03. That cannot hold: PRP-01 lands first and `make seed` must create both demo profiles, and the builder needs `age_band`, `bodyweight_kg` and `has_overhead_anchor` for the §3.3 caps and §1.7 filtering. **This PRP owns the two tables and `age_band()`; PRP-03 owns the services and screens over them.** PRP-03 states the same split.
 
 ### Library file layout
 
@@ -188,10 +190,11 @@ def materialise_rows(workout: Workout, week: int, profile: Profile, settings: Se
 
 ## Implementation notes
 
-- **Validator signature is architecture §5's**: `validateur.validate_workout(doc, profile_kind, age_band, equipment)`. Principles §3.10 shows a different one; architecture wins (PRP README). Treat any non-empty return as failure; do not depend on a `Violation` class beyond `str(v)`.
+- **Validator call.** PRP-00 owns `validateur.validate_workout(doc, *, profile_kind, age_band, equipment, bodyweight_kg=None, has_overhead_anchor=False, exercises=None, youth_rules=None)`, returning a frozen `ValidationResult(ok: bool, errors: list[ValidationError])`. **Gate on `result.ok`, never on `len(result.errors)` and never on the result's truthiness** — it is a Pydantic model and is always truthy, and two codes (`youth_rep_ceiling`, `youth_rpe_exceeded`) are warnings that a valid seed workout may legitimately carry. The correct call is `if not result.ok: fail(result.errors)`.
 - **Loader order**: parse every file with `yaml.safe_load` → build docs → resolve `regression_of` / `progression_of` and derive the inverse links → check every referenced id exists → validate each workout for its `target_profile_kind` at every band it claims to serve → upsert. Any error aborts the whole load with a non-zero exit and a list of `file:doc_id: message` lines. Never partially seed.
 - **Seed profiles**: `me` (`kind=adult`, `age_years=None`, `vitalforge_person` from `VITALFORGE_PERSON_ME`, `push_to_garmin=True`) and `son` (`kind=youth`, `age_years=None` → band `u10` per §3.8, `vitalforge_person` from `VITALFORGE_PERSON_SON`, `push_to_garmin=False`). Settings defaults: `equipment=["bodyweight","dumbbells","kettlebells","bench"]`, `weights_available="DB 5-52.5 lb adj step 2.5, KB 16/24 kg, BENCH adjustable"`, `days_per_week=4`, `session_minutes=30`, `push_son_to_garmin=false`, `setup_complete=false`, `timers_default_on=false`, `readiness_nudge_on=true`.
 - **`seed(reset=False)`** upserts by id and never deletes rows whose `source != "seed"`. `make seed` is idempotent.
+- **`mobility_carry` resolves per profile.** For an adult it is `mobility-carry-day` (§10.11); for a youth profile it is `son-play-day` (§10.8). At `days_per_week=6` the sixth slot is a repeat of `upper_a` for an adult and `son-play-day` for a youth profile, so a six-day youth week legitimately contains two play days. Write this rule down rather than letting the pool picker choose.
 - **Rotation** is `[upper_a, lower_a, upper_b, lower_full_b]` indexed continuously across weeks (§6.3). `assessment` **replaces** the first slot of week 1 of the block; the displaced day type is skipped for that block and the rotation index still advances. A 4-day block therefore has 16 planned sessions: 1 assessment + 15 training.
 - **Prelude is prepended to every session including `assessment`.** §2 is categorical; §10.10's numbered list is the measured block only. Prelude rows use `variant: youth` for any youth band (drop `dead-bug`, `open-book` → 4 per side).
 - **Youth path**: filter the pool by `youth_ok[band] != no` (`conditional` requires the §3.6 bodyweight test, else substitute `kb-deadlift` then `hip-hinge-bw`) and by `banned_tags`; row count `max(3, min(parent_row_count - 1, max_exercises_per_session))`; at least one `play` row; clamp sets, reps, rest and `session_minutes` to the band; clamp loads down to `effective_cap` (§3.3) and append a `notes` line. Never reject a row at build time — clamping is the build-time behaviour, rejection is the validator's job on imported/generated docs (D-019).
@@ -210,13 +213,13 @@ def materialise_rows(workout: Workout, week: int, profile: Profile, settings: Se
 2. `test_seed_ids_match_principles` — the exercise id set equals the literal set transcribed from §9 (list it in the test, do not derive it from the YAML).
 3. `test_every_link_resolves` — every `regression_of` / `progression_of` target exists; inverse links are derived and symmetric.
 4. `test_three_orphan_exercises_are_expected` — `knee-push-up`, `kb-row`, `single-leg-rdl-db` appear in no seed workout and this is asserted, not incidental.
-5. `test_youth_workouts_pass_every_band` — `son-upper-a`, `son-lower-a`, `son-play-day` validate at `u10`, `age_10_13`, `age_14_17`.
-6. **Negative** `test_adult_workouts_fail_youth_validation` — `upper-a`, `lower-a`, `lower-full-b`, `mobility-carry-day` each return at least one error at `u10`, and the error names the load-type or tag rule (§3.2/§3.4).
+5. `test_youth_workouts_pass_every_band` — `son-upper-a`, `son-lower-a`, `son-play-day` return `ok is True` at `u10`, `age_10_13` and `age_14_17`. Warnings are permitted; errors are not.
+6. **Negative** `test_adult_workouts_fail_youth_validation` — `upper-a`, `lower-a`, `lower-full-b`, `mobility-carry-day` each return `ok is False` at `u10`, carrying `youth_load_type_not_allowed` or `youth_banned_tag` (§3.2/§3.4).
 7. **Negative** `test_unknown_garmin_category_rejected` — a doc with `garmin_category: BARBELL` fails to load.
 8. **Negative** `test_missing_link_target_aborts_load` — a doc with `regression_of: no-such-exercise` aborts the whole load and seeds nothing.
 9. `test_program_4day_30min_has_16_sessions` — `days_per_week=4`, `session_minutes=30` → 16 planned sessions; each `rows_json[0].role == "prelude"`; the first session of week 1 has `day_type == "assessment"`.
 10. `test_30min_session_has_five_rows_excluding_prelude` — and 15 min → 3, 45 min → 7 (§6.4).
-11. `test_days_per_week_mapping` — 2 → `[upper_a, lower_full_b]`; 3 across two weeks → `[upper_a, lower_a, upper_b]` then `[lower_full_b, upper_a, lower_a]`; 5 adds `mobility_carry`; 6 for `son` adds `son-play-day`, for `me` repeats `upper_a`.
+11. `test_days_per_week_mapping` — 2 → `[upper_a, lower_full_b]`; 3 across two weeks → `[upper_a, lower_a, upper_b]` then `[lower_full_b, upper_a, lower_a]`; 5 adds `mobility_carry`, which resolves to `mobility-carry-day` for `me` and `son-play-day` for `son`; 6 repeats `upper_a` for `me` and gives `son` a second `son-play-day`.
 12. `test_deload_week_reduces_sets` — every week-4 row has `sets == max(2, floor(sets_w3 * 0.60))` and `reps == rep_min`, load unchanged (§5.5).
 13. `test_week_schemes` — week 1/2/3 reps for a `main` row are 8/10/8 with 3/3/4 sets, and a template week-1 override wins (P7: `upper-a` `plank` is 40 s in week 1, 50 s in week 2).
 14. `test_load_rounding_cases` — parametrised: target 20.0 on the household DB ladder → 19.28; target 1.0 → 2.27 when uncapped; target 20.0 with `cap=5.0` → 4.54; `cap=1.0` → `None`; discrete KB ladder target 20.0 → 16.0.

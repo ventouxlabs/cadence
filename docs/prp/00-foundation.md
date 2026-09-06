@@ -22,13 +22,15 @@ Domain *values* (enum members, youth numbers, seed data) come from `docs/exercis
 
 | Owned by | Thing |
 |---|---|
-| PRP-01 | `library/*.yaml` content, `youth_rules.yaml` values, `make seed` loader body, program builder |
-| PRP-02 | Jinja templates, HTMX, service worker, Today |
-| PRP-03 | `profile` / `setting` tables and services, age-band derivation |
-| PRP-04 | `session`, `session_row`, history |
+| PRP-01 | `library/*.yaml` content, `youth_rules.yaml` values, `make seed` loader body, program builder, **the `profile` / `setting` tables and `age_band()`** |
+| PRP-02 | Jinja templates, HTMX, service worker, Today, **the `session` / `session_row` tables** |
+| PRP-03 | Profiles and settings **services and screens** (Setup, Settings, youth rules wired end to end) |
+| PRP-04 | History queries, weekly scorecard, streak |
 | PRP-06 | `cadence/vitalforge/` bodies, `metrics_cache`, `sync_job` |
 | PRP-08 | `cadence/ia/`, `/api/import`, `/api/generate` |
 | PRP-09 | Dockerfile, compose, deploy |
+
+Two of those rows follow build order rather than subject matter. `make seed` (PRP-01) creates the two demo profiles and a program for each, and the program builder needs `age_band()`, `bodyweight_kg` and `has_overhead_anchor` for the cap arithmetic and anchor filtering — so PRP-01 owns the `profile` and `setting` tables and PRP-03 owns the services and screens over them. Likewise PRP-02 creates a `session` on the first render of Today and writes `session_row` on every tick, so it owns both tables and PRP-04 only queries them.
 
 `make seed` exists as a target and exits 0 with "no library yet"; PRP-01 fills it.
 
@@ -300,7 +302,7 @@ Gotchas the implementer must build in:
 def create_app(settings: Settings | None = None) -> FastAPI
 ```
 
-Lifespan calls `init_db()` on startup. Router registration is a list so later PRPs append one line. `app = create_app()` at module scope for uvicorn. No middleware, no auth (D-009).
+Lifespan calls `init_db()` on startup. Router registration is a list so later PRPs append one line. `app = create_app()` at module scope for uvicorn. No middleware and no auth (D-009) — with one declared exception: PRP-02 adds `GZipMiddleware`, because the 60 KB page budget is unreachable with vendored HTMX served uncompressed. That is a logged deviation with its own DECISIONS entry, not licence for further middleware here.
 
 ### 7.4 Makefile
 

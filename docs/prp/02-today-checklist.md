@@ -26,6 +26,9 @@ The product. Open the app, see today's session as a checklist, tick rows with on
 
 1. **The session row is created on first render of `/today`, not on first tick.** Architecture §3 says first tick. The offline queue needs a durable `session_id` before the first tap, otherwise a tick taken offline has nothing to address. `started_at` stays `NULL` until the first tick, so "when did the session begin" is unchanged.
 2. **Session completion is derived, not stored.** `planned_session.status` keeps architecture's `planned|done|skipped`. A helper in `cadence/seance/status.py` decides `complete` vs `partial`.
+3. **`create_app()` gains `GZipMiddleware`.** PRP-00 states "no middleware". The 60 KB page budget in architecture §5 is unreachable with vendored HTMX served uncompressed, so this is a two-line shim in PRP-00's file, declared here and reported by the implementer.
+
+> **Seam correction.** PRP-00's deferral table assigns `session` and `session_row` to PRP-04. They belong here: this PRP creates a session on first render and ticks its rows. PRP-04 only queries them.
 
 ## Data model
 
@@ -257,4 +260,4 @@ Backend `tests/test_today.py`, `tests/test_sessions_api.py`. UI `tests/e2e/test_
 - [ ] HTMX vendored with a pinned version comment; no external requests on any page.
 - [ ] `/today` cold-loads under 60 KB transferred.
 - [ ] All 26 acceptance tests pass; `make lint && make test && make e2e` green.
-- [ ] `docs/DECISIONS.md` carries the two deviations.
+- [ ] `docs/DECISIONS.md` carries the three deviations.

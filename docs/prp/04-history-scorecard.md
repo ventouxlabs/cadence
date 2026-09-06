@@ -185,7 +185,7 @@ For a youth profile the `trend` key is **absent**, not null — the serializer m
 15. `test_history_without_sync_job_table` — badges read "Stored locally", no 500.
 16. **Negative** `test_limit_out_of_range` — `limit=0` and `limit=500` → 422.
 17. **Negative** `test_unknown_profile` — `?profile=nobody` → 404 with the envelope's `error` set.
-18. `test_no_n_plus_one` — count queries with an echo listener; the session list issues a constant number of statements for 1 and for 30 sessions.
+18. `test_no_n_plus_one` — count statements with a SQLAlchemy event listener and assert the count for a 1-session fixture **equals** the count for a 30-session fixture. Never assert a literal number: session setup and the `sync_job` join make an absolute count brittle.
 19. `e2e_history_renders_sessions` — 390×844, three session cards visible, each showing "N of M".
 20. `e2e_sparkline_visible_for_parent` — `svg[data-role="trend"]` present with two polylines after seeding two cache points.
 21. `e2e_no_trend_line_for_son` — the same selector is absent on `?profile=son`.

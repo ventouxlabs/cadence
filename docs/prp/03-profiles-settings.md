@@ -20,7 +20,7 @@ Everything JD was never asked. A one-time Setup screen that gates the app until 
 - Import and Generate internals and their partials — **owned by PRP-08**. This PRP ships the two empty sections and the exact partial names.
 - The Today screen — **owned by PRP-02**. History — **PRP-04**. Assessments — **PRP-07**.
 - VitalForge connectivity checks — **owned by PRP-06**. Person slugs are plain text fields here.
-- `profile`/`setting` DDL and `age_band()` — **owned by PRP-01**.
+- `profile`/`setting` DDL and `age_band()` — **owned by PRP-01**. PRP-00's deferral table assigns them here; that is corrected in PRP-01. This PRP owns the services and screens over those tables, not the tables.
 
 ## Data model
 
