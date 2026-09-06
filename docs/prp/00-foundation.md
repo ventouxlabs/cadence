@@ -64,6 +64,8 @@ All models: `model_config = ConfigDict(extra="forbid", frozen=True)`. `extra="fo
 
 **Enum member values are exactly `docs/exercise-principles.md` §11.** Do not invent members. Required enums: `AgeBand`, `Pattern`, `Region`, `LoadType`, `LoadUnit`, `Measure`, `Equipment`, `ExerciseTag`, `ProgressionType`, `RegressTrigger`, `AutoregOutcome`, `Felt`, `Readiness`, `SessionStatus`, `GoalType`, `DayType`, `AssessmentId`, `TargetTier`, `GarminCategory`.
 
+One enum is **not** in §11's list: `YouthAllow = yes | no | conditional`, the three states of §9's per-band columns (`Y` / `N` / `Y*`). It is named here because §9 uses symbols rather than identifiers.
+
 All are `str, Enum`.
 
 > **`GarminCategory` has no `UNKNOWN` member.** `garminconnect` 0.3.11 does not define one (`docs/vitalforge-contract.md` §3.1) and emitting it earns a Garmin 400. "Variant unknown" is encoded as `garmin_category: None`, per D-018. Members = the 26 confirmed present in `exercises.CATEGORIES` (contract §3.1).
@@ -96,8 +98,15 @@ The enum **is** the whitelist; membership is the check. Anything not an `Equipme
 | `progression_of` | `str \| None` | exercise id |
 | `default_progression` | `str \| None` | progression id |
 | `est_seconds_per_set` | `int \| None` | 1–600 |
+| `youth_ok_by_band` | `dict[AgeBand, YouthAllow]` | default `{}`; see below |
 
 Model validator: `garmin_exercise` set with `garmin_category is None` → error (a sub-category needs its parent, contract §4.3).
+
+**`youth_ok_by_band` is the `<10` / `10–13` / `14–17` columns of `docs/exercise-principles.md` §9**, which that section says are checked "in addition to" the load-type and tag rules of §3, stricter winning. `YouthAllow = yes | no | conditional` (§9's `Y` / `N` / `Y*`).
+
+It lives on `Exercise` and is checked by `validate_workout`, not by a library-side helper, because the brief's hard rule requires that **neither an imported nor an AI-generated workout can bypass youth rules**. A helper the import and generate paths must remember to call is exactly that bypass. Without this field, `kb-swing` at 40 kg bodyweight passes V1 and V2 for a 14-year-old whose band allows kettlebells, while §3.6 says it is illegal.
+
+The `adult` band is never consulted. **A youth band absent from the dict is `no`** — the allowlist fails closed, so a seed row that forgets a column denies rather than permits.
 
 ### 4.4 `WorkoutRow`
 
@@ -127,7 +136,28 @@ Model validator: **exactly one** of `reps`/`seconds`/`meters`/`steps` is non-nul
 
 ### 4.6 `Progression`
 
-`id` · `type: ProgressionType` · `rep_low: int | None` · `rep_high: int | None` · `load_step_kg: float | None` (0–20) · `time_step_s: int | None` (0–120) · `bump_after_n_easy: int` (default 1) · `regress_triggers: list[RegressTrigger]` · `deload_pct: float` (0–1, default 0.4).
+Field-for-field as `docs/exercise-principles.md` §5.1. One shape serves two lives: it is the default stored on a seed exercise **and** the per-user mutable state copied onto each workout row at generation time. PRP-01 seeds the defaults; PRP-07 reads and rewrites the same field names out of `planned_session.rows_json`. Do not fork it into two models.
+
+| Field | Type | Constraint |
+|---|---|---|
+| `id` | `str` | slug; **an addition** — architecture §1 gives progressions their own `library/progressions/*.yaml`, which needs a key. Principles §5.1 has no `id` because it only ever shows the embedded copy |
+| `type` | `ProgressionType` | required |
+| `rep_min` | `int \| None` | 1–100 |
+| `rep_max` | `int \| None` | 1–100 |
+| `load_step_kg` | `float \| None` | 0–20 |
+| `load_step_pct` | `float \| None` | 0–1; used when `load_step_kg` is `None` |
+| `time_step_s` | `int \| None` | 0–120 |
+| `distance_step_m` | `int \| None` | 0–200 |
+| `regress_on` | `list[RegressTrigger]` | subset of `{hard, missed, low_readiness}` |
+| `regress_step` | `float` | 0–1, **default `0.10`** — fraction of current load |
+| `regress_reps` | `int` | 0–20, **default `2`** — reps removed when load cannot drop |
+| `deload_pct` | `float` | 0–1, **default `0.60`** |
+| `allow_load_progression` | `bool` | default `True`; **`False` for every youth band** (§5.6) |
+| `cap_load_kg` | `float \| None` | injected by the validator from principles §3.3; the injection returns a copy via `model_copy(update=...)`, never an in-place set |
+
+> **`deload_pct` is `0.60`, not `0.40`.** Set arithmetic hides the difference — `max(2, floor(sets × pct))` gives 2 for three and four sets either way — but **carry distance scales by it directly** (§5.5: "Carries: distance × `deload_pct`"), so a wrong default silently shortens every deload-week carry by a third. Test 30 pins the value.
+
+Names are principles' names: `rep_min`/`rep_max` (not `rep_low`/`rep_high`) and `regress_on` (not `regress_triggers`). There is no `bump_after_n_easy` — bump timing is decided by §5.4's ordered decision rules, not by a counter on the progression.
 
 ### 4.7 `YouthRuleSet`
 
@@ -200,8 +230,11 @@ Never raises on bad input. A `ValidationError` from Pydantic is caught and flatt
 | `youth_banned_goal` | V11 | error | profile goal type in `banned_goal_types` |
 | `youth_rpe_exceeded` | V12 | **warn** | `rpe_target > rpe_cap` |
 | `requires_anchor_unavailable` | V13 | error | row tagged `requires_anchor` and `has_overhead_anchor is False` |
+| `youth_exercise_not_allowed` | **V14** | error | the exercise's `youth_ok_by_band` denies this band (§5.3) |
 
-Order of evaluation: schema → exercise resolution → equipment → measure → youth V1–V13. All errors are collected; the validator never short-circuits after the first.
+**V14 is an addition to principles §3.10's V1–V13 table**, sourced from §9's per-band columns. §9 states those columns are checked in addition to §3's rules, so the check exists; §3.10 simply predates it. Remedy: substitute via `regression_of`.
+
+Order of evaluation: schema → exercise resolution → equipment → measure → youth V1–V14. All errors are collected; the validator never short-circuits after the first.
 
 ### 5.2 Effective load cap (principles §3.6/§3.4)
 
@@ -216,6 +249,20 @@ cap_for(load_unit, rules, bodyweight_kg):
 ```
 
 `bodyweight_kg` defaults to `None` (principles §3.8) — **fall back to the absolute kg cap, never raise, never treat a missing bodyweight as unlimited.**
+
+### 5.3 The per-band allowlist (V14)
+
+For a youth profile, resolve `exercise.youth_ok_by_band.get(age_band, "no")`:
+
+| Value | Result |
+|---|---|
+| `yes` | permitted; V1–V13 still apply, stricter wins |
+| `no`, or the band is absent | `youth_exercise_not_allowed`, remedy "substitute via `regression_of`" |
+| `conditional` | permitted **only if `bodyweight_kg` is not `None`**; V1–V13 then decide, with V2 evaluated against the percentage-of-bodyweight cap |
+
+> **`conditional` is the one place a missing `bodyweight_kg` denies rather than falls back.** §5.2's fallback to the absolute kg cap would let a 16 kg kettlebell through for an unweighed 14-year-old, and principles §3.6 says the opposite: "If the bodyweight test fails **or bodyweight is unknown**, the engine substitutes." So V14 rejects a `conditional` row when the bodyweight is unknown, before §5.2's fallback is ever reached. Test 31 pins this interaction, which is the subtlest rule in the validator.
+
+`conditional` needs no per-exercise condition expression: §3.6's real condition (16 kg, two-handed, `0.35 × bodyweight_kg >= 16`) is V2's percentage cap plus V1's `load_unit` check. `conditional` only gates *whether those run against a known bodyweight*.
 
 ## 6. API surface
 
@@ -378,6 +425,13 @@ Numbered; each is a real test name.
 26. `::test_youth_banned_tag_is_rejected` — a row whose exercise carries `max_effort` under `u10` → `youth_banned_tag`. **Negative.**
 27. `::test_adult_profile_is_not_youth_checked` — the same over-cap workout passes for `profile_kind="adult"`, proving the youth gate is band-scoped and not global.
 28. `tests/test_envelope.py::test_envelope_shape` — `ok()` and `err()` both produce exactly the four keys `ok/data/error/meta`.
+29. `tests/test_schema.py::test_progression_field_names_match_principles` — `set(Progression.model_fields) == {id, type, rep_min, rep_max, load_step_kg, load_step_pct, time_step_s, distance_step_m, regress_on, regress_step, regress_reps, deload_pct, allow_load_progression, cap_load_kg}`. Catches a rename back to `rep_low`/`regress_triggers` and any silently dropped field. **Negative.**
+30. `::test_progression_defaults` — `deload_pct == 0.60`, `regress_step == 0.10`, `regress_reps == 2`, `allow_load_progression is True`. **`deload_pct` is the one that scales carry distance directly.**
+31. `tests/test_schema_bypass.py::test_conditional_denied_when_bodyweight_unknown` — a `conditional` exercise for `age_14_17` with `bodyweight_kg=None` → `youth_exercise_not_allowed`. **The §5.2 fallback must not rescue it. Negative.**
+32. `::test_conditional_allowed_when_bodyweight_known` — the same row with `bodyweight_kg=50.0` passes V14 and is then decided by V1/V2.
+33. `::test_band_absent_from_allowlist_denies` — an exercise whose `youth_ok_by_band` omits the profile's band → `youth_exercise_not_allowed`. **Fails closed. Negative.**
+34. `::test_allowlist_denies_even_when_load_rules_pass` — the `kb-swing` case from principles §3.6: `age_14_17`, bodyweight 40 kg, a load the band's absolute cap permits, `youth_ok_by_band[age_14_17] == "conditional"` → still rejected. **This is the test that proves the allowlist is not redundant with V1/V2. Negative.**
+35. `::test_adult_ignores_allowlist` — an exercise marked `no` for every youth band passes for `profile_kind="adult"`.
 
 ## 9. Devil's-advocate risks
 
@@ -391,6 +445,8 @@ Numbered; each is a real test name.
 8. **The 80 % gate blocks PRP-01 the moment empty packages are added.** → Empty domain packages contain only a docstring and no code, so they add no uncovered lines. Do not add placeholder functions.
 9. **`asyncio_mode="auto"` plus a sync test client leads to silently skipped assertions.** → The `client` fixture is async and every route test is `async def`.
 10. **A future SQLite downgrade corrupts data silently.** → Test 9 makes the version check a hard failure.
+11. **The per-band allowlist drifts out of the validator** into a library helper that `/api/import` and `/api/generate` must remember to call. The brief's hard rule is that neither path can bypass youth rules, so a check reachable only by convention is a bypass. → `youth_ok_by_band` is a field on `Exercise` and V14 runs inside `validate_workout`; tests 31–34.
+12. **`conditional` is read as "probably fine".** An unweighed 14-year-old then gets a 16 kg kettlebell, because §5.2's absolute-cap fallback quietly permits it. → §5.3 makes unknown bodyweight a denial for `conditional` only, and test 31 pins the interaction.
 
 ## 10. Done when
 
@@ -404,5 +460,5 @@ Numbered; each is a real test name.
 - [ ] CI green on both jobs.
 - [ ] `.env.example` committed with the two VitalForge URLs, the OmniRoute URL, both model names, and **blank** token values; `.env` is git-ignored and absent from the diff.
 - [ ] Every model in `cadence/schema/__all__` is frozen and `extra="forbid"`.
-- [ ] All 28 acceptance tests present and passing.
+- [ ] All 35 acceptance tests present and passing.
 - [ ] `grep -ri "sk-\|Bearer [A-Za-z0-9]" --include="*.py" --include="*.md" .` returns nothing.
