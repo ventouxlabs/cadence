@@ -33,10 +33,15 @@ Make the plan respond. After a session finishes, the next session of that day ty
 Progression state lives in `planned_session.rows_json`. Each row gains, on top of PRP-01's shape:
 
 ```json
-{"progression": {"type": "double_progression", "rep_min": 8, "rep_max": 12,
-                 "load_step_kg": 1.13, "cap_load_kg": 5.0, "allow_load_progression": false},
+{"progression": {"type": "double_progression", "rep_low": 8, "rep_high": 12,
+                 "load_step_kg": 1.13, "time_step_s": 10, "deload_pct": 0.60,
+                 "regress_triggers": ["hard", "missed", "low_readiness"],
+                 "cap_load_kg": 5.0, "allow_load_progression": false,
+                 "regress_step": 0.10, "regress_reps": 2, "distance_step_m": 10},
  "pending_bump": false, "last_outcome": "hold"}
 ```
+
+Field names are **PRP-00 §4.6's `Progression`**, so principles §5.1's `rep_min`/`rep_max`/`regress_on` are `rep_low`/`rep_high`/`regress_triggers` here. The six fields PRP-00 does not model (`cap_load_kg`, `allow_load_progression`, `regress_step`, `regress_reps`, `distance_step_m`, `load_step_pct`) are runtime state written into `rows_json` by PRP-01's `materialise_rows`; read them from the row, never from the schema model. `deload_pct` is 0.60 per §5.5, not PRP-00's model default of 0.4.
 
 `pending_bump` is set when R1 (deload) suppresses an earned bump; it is consumed by week 1 of the next block (§5.4).
 
@@ -156,7 +161,7 @@ def autoregulate_next(session, finished_session) -> list[str]: ...   # returns h
 - Post-bump, re-round to the ladder (§8.4) and re-clamp (§3.3), in that order.
 - `autoregulate_next` finds the **next `planned` session with the same `day_type`** for that profile and rewrites its `rows_json` row by row, matching rows by `exercise_id` and falling back to `position`. Rows with no counterpart are left alone. It runs on Done, after finalisation, inside the same transaction, and never touches a session that already has a `session` attached.
 - **Assessment day runs no autoregulation** (§10.10). Put the guard at the **call site**: PRP-02's Done service checks `planned_session.day_type == "assessment"` and returns before calling `autoregulate_next`. Do not bury it inside `decide()`, where a future caller would miss it.
-- **Deload week 4**: `sets = max(2, floor(sets * 0.60))`, `reps = rep_min`, load unchanged, `rpe_cap = 6`, carries scale distance by 0.60. An earned bump sets `pending_bump: true` and is applied at week 1 of the next block.
+- **Deload week 4**: `sets = max(2, floor(sets * 0.60))`, `reps = rep_low`, load unchanged, `rpe_cap = 6`, carries scale distance by 0.60. An earned bump sets `pending_bump: true` and is applied at week 1 of the next block.
 - **Missed sessions** (D-011, §5.7): `missed_sessions_7d` counts scheduled slots in the trailing seven days with no completed session, where a slot is `days_per_week` evenly spread. More than 14 days with zero completed sessions restarts the block at week 1 with every load × 0.90, re-rounded, and one line on Today: `Welcome back. Starting the block again, a little lighter.`
 - `week_of_block = min(4, floor(complete_sessions_in_block / days_per_week) + 1)` — PRP-01's `week_of_block`, counting only `complete` sessions (PRP-02's `completion()`).
 
@@ -181,6 +186,7 @@ Loads render in the profile's `display_unit` (PRP-03). For a youth profile the n
 - Gap detection is §7.5 exactly: below the `ok` tier (adult) or the band fun target (youth); `unavailable` excluded; ranked by `(ok_threshold - measured) / ok_threshold` descending; ties broken by the fixed order `dead_hang_s, push_up_max, plank_s, wall_angel_reach, goblet_squat_quality, farmer_carry_s`; adult-only `body_comp` gap appended last when the 28-day trend shows body fat flat-or-rising and muscle percent flat-or-falling; top 3.
 - "Flat" means a slope within ±0.05 percentage points per week over the cached window. With fewer than 10 cached points, no `body_comp` gap is emitted.
 - Challenge names: adult `"{test_display} {target_value}{unit} by {due_date:%-d %b}"`; youth the fixed play phrase from §7.4 with a number that is a count or a duration only. `target_value` is the `ok` threshold (adult) or the band fun target (youth).
+- A challenge row for a youth profile must pass PRP-01's `youth_allows(exercise_id, band, bodyweight_kg)` as well as the validator, because §9's per-band allowlist is not enforced by PRP-00's validator.
 - **Challenge rows** are handed to `materialise_rows(..., challenge_rows=[...])` (PRP-01's hook) and land as the **last row** of each matching `day_type`, `is_challenge=true`, at most one per session, up to `frequency` sessions per week. P5: a challenge row may exceed the session-length row count by exactly one but never `max_exercises_per_session`. The `wall_angel_reach` challenge appends to the prelude tail instead (§2), raising it to ≤ 380 s, and is **suppressed on assessment day** so the test is not pre-fatigued.
 - A challenge closes `met` when a later assessment reaches `target_value`, and `expired` at `due_on`. Expired challenges are re-derived from the next assessment.
 - Baseline: the program's week-1 assessment session (PRP-01). Until an assessment exists the Today card shows; `Skip` marks it skipped, and the card returns on the next session until a baseline is recorded.
@@ -195,10 +201,10 @@ Loads render in the profile's `display_unit` (PRP-03). For a youth profile the n
 4. `test_pending_bump_applied_next_block` — the stored bump lands on week 1 of the next block and clears.
 5. `test_partial_excluded_from_r7` — a partial session with rows unticked and `felt == right` → `hold` via R10/R11, never `regress`.
 6. `test_felt_none_falls_through` — `felt is None` with `readiness == "low"` → `hold` (R6).
-7. `test_bump_arithmetic_double_progression` — reps +1 until `rep_max`, then load +step and reps reset to `rep_min`, re-rounded to the ladder.
-8. `test_bump_rep_progression_advances_exercise` — at `rep_max` the row swaps to `progression_of` at `rep_min`.
+7. `test_bump_arithmetic_double_progression` — reps +1 until `rep_high`, then load +step and reps reset to `rep_low`, re-rounded to the ladder.
+8. `test_bump_rep_progression_advances_exercise` — at `rep_high` the row swaps to `progression_of` at `rep_low`.
 9. `test_regress_drops_load_then_reps_then_exercise` — the three-step fallback of §5.5.
-10. `test_deload_values` — 3 sets → 2, 4 sets → 2, reps → `rep_min`, load unchanged, carry distance × 0.60.
+10. `test_deload_values` — 3 sets → 2, 4 sets → 2, reps → `rep_low`, load unchanged, carry distance × 0.60.
 11. `test_youth_cap_never_exceeded` — property-style: 20 consecutive all-ticked `felt=easy` sessions for a `son` at `age_10_13`; after every one, assert every row's `load_kg <= effective_cap` and that reps stay within `rep_max_loaded`.
 12. `test_youth_bump_order` — reps first, then seconds, then `progression_of`, and load only when the first three are exhausted.
 13. `test_missed_sessions_two_regress` — `missed_sessions_7d == 2` → `regress` (R3) even with `felt == easy`.
