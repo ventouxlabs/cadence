@@ -32,3 +32,6 @@ playwright-report/
 # OMC state
 .omc/
 data/
+
+# Screenshots from the end-to-end suite
+.shots/

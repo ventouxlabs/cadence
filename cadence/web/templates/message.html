@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Cadence{% endblock %}
+{% block content %}
+<section class="summary">
+  <h1 class="summary-head">Not today</h1>
+  <p class="summary-line">{{ message }}</p>
+  <nav class="summary-actions">
+    <a class="action" href="/today?profile=me">Me</a>
+    <a class="action" href="/today?profile=son">Son</a>
+  </nav>
+</section>
+{% endblock %}

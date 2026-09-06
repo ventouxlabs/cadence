@@ -125,3 +125,58 @@ def program_settings():
     from cadence.profils.settings import DEFAULT_SETTINGS
 
     return DEFAULT_SETTINGS
+
+
+@pytest.fixture
+def db_session(settings: Settings, app: FastAPI):
+    """A plain database session against the same file the app uses."""
+    from sqlmodel import Session as DbSession
+
+    from cadence.db import get_engine
+
+    with DbSession(get_engine(settings)) as session:
+        yield session
+
+
+@pytest.fixture
+def seeded(db_session, app: FastAPI) -> FastAPI:
+    """The app with the real library loaded and a four-week block per profile."""
+    from cadence.bibliotheque.seed import seed
+
+    seed(db_session, LIBRARY_PATH)
+    return app
+
+
+@pytest.fixture
+async def seeded_client(seeded: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    transport = httpx.ASGITransport(app=seeded)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+def aged_son(db_session, seeded: FastAPI) -> FastAPI:
+    """The son at eleven, so his block carries loaded rows under the ``age_10_13`` caps."""
+    from datetime import date
+
+    from cadence.bibliotheque.loader import load_library
+    from cadence.bibliotheque.seed import _rebuild_program
+    from cadence.profils.settings import DEFAULT_SETTINGS
+    from cadence.profils.tables import PROFILE_SON, Profile
+
+    son = db_session.get(Profile, PROFILE_SON)
+    son.age_years = 11
+    son.age_band = "age_10_13"
+    db_session.add(son)
+    db_session.commit()
+    _rebuild_program(db_session, son, DEFAULT_SETTINGS, load_library(LIBRARY_PATH), date(2026, 9, 6))
+    db_session.commit()
+    return seeded
+
+
+@pytest.fixture
+async def aged_son_client(aged_son: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    """A client over a database where the son is eleven, so his rows carry real loads."""
+    transport = httpx.ASGITransport(app=aged_son)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client

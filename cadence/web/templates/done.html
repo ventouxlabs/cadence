@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Done · Cadence{% endblock %}
+{% block content %}
+<section class="summary">
+  <h1 class="summary-head">Done. <span aria-hidden="true">&#10003;</span></h1>
+  {% for item in summaries %}
+  <div class="summary-card">
+    {% if summaries|length > 1 %}<h2 class="summary-who">{{ item.display_name }}</h2>{% endif %}
+    <p class="summary-line">{{ item.duration_min }} minute{{ '' if item.duration_min == 1 else 's' }}</p>
+    <p class="summary-line">{{ item.rows_done }} of {{ item.rows_total }} exercises</p>
+    <p class="summary-line">{{ item.next_time_note }}</p>
+  </div>
+  {% endfor %}
+  {# PRP-06 replaces both lines with the real sync status. Until then "stored" is only true once
+     the server has the session: a Done taken offline reaches this page from the queue first. #}
+  {% if pending %}
+  <p class="sync" id="sync-status">Saved on this phone — will sync.</p>
+  {% else %}
+  <p class="sync" id="sync-status">Stored locally.</p>
+  {% endif %}
+  <nav class="summary-actions">
+    <a class="action" href="/today?profile={{ profile_key }}">Back to today</a>
+    <a class="action" href="/history?profile={{ profile_key }}">History</a>
+  </nav>
+</section>
+{% endblock %}

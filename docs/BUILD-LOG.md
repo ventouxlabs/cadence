@@ -29,3 +29,10 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Reviewer swept 15,744 compiled sessions (zero cap breaches); 3 Highs (seed deleted done sessions, no backfill for dropped main, fallback_exercise unread) + 4 Mediums fixed; re-verify found 1 more High (one-hop demotion) fixed via BFS + pattern fallback.
 - Final: 945 passed, 94% coverage, lint clean, seed idempotent. D-050..D-068.
 - Squash-merged to main, tagged prp-01 (and prp-05 close-out tag placed on main), pushed.
+
+## prp-02 — today-checklist — 2026-09-06
+- Implementer built session tables, seance services, Today/Done/Together, PWA + offline queue, HTMX vendored (1016 tests, 15 e2e).
+- Tester added 44 pytest + 21 e2e (replay abuse, Together Done, youth surface), fixed NaN-body 500 and a fixture exhausting the plan; screenshots reviewed by orchestrator.
+- Reviewer: 2 Highs (writes on a finished session materialised the next one; Together Done ignored the son's checklist) + 5 Mediums fixed and re-verified APPROVE; follow-up batch fixed felt scoping, per-session promotion, footer occlusion, atomic patch.
+- Implementer hit the account session limit on the last two items; orchestrator verified the uncommitted work (lint, 1087 pytest, 45 e2e green) and committed it.
+- Squash-merged to main, tagged prp-02, pushed. D-070..D-084.

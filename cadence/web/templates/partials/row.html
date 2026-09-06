@@ -1,0 +1,69 @@
+{# One checklist row. The whole card is the tap target; the form posts on any change inside it,
+   and the <noscript> button is the fallback when HTMX is not running.
+   The id carries the profile because Together renders two sessions whose positions collide. #}
+{% set tick_url = "/today/" ~ view.record.id ~ "/rows/" ~ row.position ~ "/tick?profile=" ~ profile_key %}
+{% set adjust_url = "/today/" ~ view.record.id ~ "/rows/" ~ row.position ~ "/adjust?profile=" ~ profile_key %}
+<form id="row-{{ view.profile.id }}-{{ row.position }}"
+      class="row{% if row.record.done %} row-done{% endif %}{% if expanded %} row-open{% endif %}"
+      method="post" action="{{ tick_url }}"
+      hx-post="{{ tick_url }}" hx-target="this" hx-swap="outerHTML" hx-trigger="change"
+      hx-include="#confirm-state"
+      data-row="{{ row.position }}" data-session="{{ view.record.id }}"
+      data-done="{{ 'true' if row.record.done else 'false' }}">
+  <label class="row-tap">
+    <input class="tick" type="checkbox" name="done" value="1"
+           {% if row.record.done %}checked{% endif %}
+           aria-checked="{{ 'true' if row.record.done else 'false' }}"
+           aria-label="{{ row.spec.name }}, {{ prescription(row, unit) }}">
+    <span class="row-body">
+      <span class="row-name">{{ row.spec.name }}</span>
+      <span class="row-line">{{ prescription(row, unit) }}</span>
+      {% if row.spec.cue %}<span class="row-cue">{{ row.spec.cue }}</span>{% endif %}
+      {% for note in row.spec.notes %}<span class="row-note">{{ note }}</span>{% endfor %}
+      {% if notice %}<span class="row-note row-notice" role="status">{{ notice }}</span>{% endif %}
+    </span>
+  </label>
+  <span class="row-tools">
+    {% if row.timed %}
+    <button type="button" class="tool timer" aria-label="Timer for {{ row.spec.name }}" aria-pressed="false"
+            data-seconds="{{ row.spec.seconds or 0 }}" data-rest="{{ row.spec.rest_s or 0 }}">
+      <span class="glyph" aria-hidden="true">&#9201;</span><span class="clock" data-clock></span>
+    </button>
+    {% endif %}
+    {% if row.adjustable %}
+    <button type="submit" class="tool adjust" name="expand" value="{{ '0' if expanded else '1' }}"
+            formaction="{{ adjust_url }}"
+            aria-label="{{ 'Close adjustments for' if expanded else 'Adjust' }} {{ row.spec.name }}"
+            aria-expanded="{{ 'true' if expanded else 'false' }}"
+            hx-post="{{ adjust_url }}" hx-vals='{"expand": "{{ '0' if expanded else '1' }}"}'
+            hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">
+      <span class="glyph" aria-hidden="true">{% if expanded %}&#10005;{% else %}&#9998;{% endif %}</span>
+    </button>
+    {% endif %}
+  </span>
+  {% if expanded %}
+  <div class="stepper-panel">
+    {% if row.reps is not none %}
+    <div class="stepper" role="group" aria-label="Reps done">
+      <span class="stepper-label">reps</span>
+      <button type="submit" class="step" name="reps" value="-1" aria-label="One rep fewer" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"reps": "-1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#8722;</button>
+      <output class="step-value" data-reps>{{ row.reps }}</output>
+      <button type="submit" class="step" name="reps" value="1" aria-label="One rep more" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"reps": "1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#43;</button>
+    </div>
+    {% endif %}
+    {% if row.load_kg is not none %}
+    <div class="stepper" role="group" aria-label="Load used">
+      <span class="stepper-label">load</span>
+      <button type="submit" class="step" name="load" value="-1" aria-label="One rung lighter" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"load": "-1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#8722;</button>
+      <output class="step-value" data-load>{{ format_load(row.load_kg, unit) }}</output>
+      <button type="submit" class="step" name="load" value="1" aria-label="One rung heavier" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"load": "1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#43;</button>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  <noscript><button type="submit" class="noscript-go">Mark done</button></noscript>
+</form>

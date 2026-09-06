@@ -4,6 +4,15 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 
 ## [Unreleased]
 
+### prp-02 — Today checklist, Done and the offline PWA (2026-09-06)
+- `session` / `session_row` tables and `cadence/seance/` (today resolution, ticks, adjust, felt, done, derived completion, cached library reads); session created on first render, `started_at` on first tick.
+- HTML UI in `cadence/web/`: `GET /` front door, `/today?profile=me|son|together`, HTMX partials for tick, adjust, felt and Done, `/done/{id}` three-line summary, plain-form fallback with JavaScript off.
+- Together mode: two sessions sharing `together_group_id`, stacked on a phone and side by side from 768 px, one Done finalising both; a solo render detaches.
+- JSON API: `GET /api/today`, idempotent `POST /api/sessions/{id}/rows/{position}` and `POST /api/sessions/{id}/done`, all on the standard envelope.
+- PWA: `manifest.json`, `/sw.js` at the origin root (network-first for `/today*`, cache-first for `/static/`), SVG plus 192/512/maskable PNG icons, IndexedDB queue `cadence-queue` in `static/app.js`, per-exercise timer, vendored HTMX 2.0.10.
+- `GZipMiddleware` (D-025); `/today` cold-loads at **24.6 KB gzipped** against a 60 KB budget.
+- 1016 tests at 94% coverage plus 15 Playwright tests at 390x844; decisions D-070 to D-082.
+
 ### prp-01 — library and program engine (2026-09-06)
 - `library/`: 52 exercises across eight pattern files, 11 workout templates, `progressions/default.yaml`, `assessments.yaml` — transcribed from `docs/exercise-principles.md` sections 9 and 10.
 - `WorkoutTemplate` / `TemplateRow` layer (`cadence/bibliotheque/template.py`): roles, per-side rows, load rules, u10 substitutes, per-profile columns — none of which exist on PRP-00's concrete `Workout`.
@@ -28,6 +37,13 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 - Program engine: 4-week rolling plan, day templates, week schemes, days/week 2–6, session-length scaling, prelude first, week-4 deload, youth filtering, substitution with fallback + breadth-first bodyweight demotion, `weights_available` parsing (200 kg ceiling) and load rounding; compiled rows re-validated for the real profile before persisting.
 - `profile`/`setting` tables and `age_band()`; two demo profiles (`me` adult, `son` youth, strictest band until age set).
 - 945 tests, 94% coverage.
+
+### prp-02 — today-checklist (2026-09-06)
+- Today screen: profile switcher (Me / Son / Both), checklist rows with sets × reps or seconds, load, one-line cue, big tap targets, adjust in ≤ 2 taps, per-exercise timer (off by default), felt toggle, youth "Good enough — done" exit, Done → 3-line summary.
+- Together mode: stacked on phone, side-by-side ≥ 768 px, shared `together_group_id`, one shared Done gated on every checklist, per-session youth exit (D-084).
+- `session`/`session_row` tables and `cadence/seance/` services; idempotent JSON replay targets; finished-session guard on every write path; youth band rules never fail open (503).
+- PWA: manifest, icons, service worker (network-first Today with cache fallback, precached offline Done page), IndexedDB queue for tick/adjust/felt/done with in-flight marking and 4xx parking; HTMX 2.0.10 vendored; GZip; cold `/today` 27.6 KB gzip of 60 KB.
+- 1087 tests, 45 Playwright tests at 390×844 (and 1024×768), 94% coverage.
 
 ### prp-05 — vitalforge-activity (2026-09-06) — branch `cadence/activity-endpoint` in ../vitalforge, not pushed
 - `POST /p/{slug}/api/activity` (202 fresh / 200 dedup / 409 cross-person / 422), `GET /p/{slug}/api/activity/{session_id}`, `GET /p/{slug}/api/strength-sessions`.

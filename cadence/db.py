@@ -18,11 +18,13 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 from cadence.config import Settings, get_settings
 
 # Imported for their side effect: a table class has to be imported before
-# ``SQLModel.metadata.create_all`` can see it. PRP-01 adds these four.
+# ``SQLModel.metadata.create_all`` can see it. PRP-01 added four, PRP-02 two more.
 from cadence.profils.tables import Profile as Profile  # noqa: F401
 from cadence.profils.tables import Setting as Setting  # noqa: F401
 from cadence.programme.tables import PlannedSession as PlannedSession  # noqa: F401
 from cadence.programme.tables import Program as Program  # noqa: F401
+from cadence.seance.tables import SessionRecord as SessionRecord  # noqa: F401
+from cadence.seance.tables import SessionRowRecord as SessionRowRecord  # noqa: F401
 
 EXPECTED_SCHEMA_VERSION = 1
 

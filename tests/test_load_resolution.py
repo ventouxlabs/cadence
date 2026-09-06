@@ -149,7 +149,7 @@ def test_no_dumbbells_demotes_the_row_to_its_bodyweight_regression(library, adul
         )
     )
     squat = next(row for row in rows if row["exercise_id"] == "bodyweight-squat")
-    assert any("no legal weight" in note for note in squat["notes"])
+    assert any("no legal load" in note for note in squat["notes"])
 
 
 def test_a_zero_kilo_rack_is_treated_as_no_rack_at_all(library, adult_profile: Profile) -> None:

@@ -10,6 +10,7 @@ from cadence.programme.ladder import (
     round_to_available,
 )
 from cadence.programme.materialise import compile_workout, materialise_rows
+from cadence.programme.next_time import next_time_note
 from cadence.programme.prescription import estimated_minutes
 from cadence.programme.schemes import row_budget, week_day_types, workout_id_for
 from cadence.programme.tables import PlannedSession, Program
@@ -26,6 +27,7 @@ __all__ = [
     "effective_cap",
     "estimated_minutes",
     "materialise_rows",
+    "next_time_note",
     "parse_weights_available",
     "program_id",
     "round_to_available",

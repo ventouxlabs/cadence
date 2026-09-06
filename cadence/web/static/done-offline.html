@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c2733">
+<title>Done · Cadence</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar"><span class="brand">Cadence</span></header>
+<main id="main">
+<section class="summary">
+  <h1 class="summary-head">Done. <span aria-hidden="true">&#10003;</span></h1>
+  <div class="summary-card">
+    <p class="summary-line" id="line-duration">Session finished on this phone.</p>
+    <p class="summary-line" id="line-rows">Counting what you ticked&hellip;</p>
+    <p class="summary-line">Next time: we will work it out once this session syncs.</p>
+  </div>
+  <p class="sync" id="sync-status">Saved on this phone — will sync.</p>
+  <nav class="summary-actions">
+    <a class="action" href="/today?profile=me">Back to today</a>
+    <a class="action" href="/history?profile=me">History</a>
+  </nav>
+</section>
+</main>
+<script>
+/* The summary the service worker serves when /done/{id} cannot be fetched. The session is
+   finished in the IndexedDB queue and nowhere else yet, so the counts come from the cached
+   /api/today payload rather than from the server. */
+(function () {
+  "use strict";
+  var id = (location.pathname.split("/")[2] || "").trim();
+  if (!id) return;
+  caches.open("cadence-v2").then(function (cache) {
+    return cache.keys().then(function (keys) {
+      var hit = keys.filter(function (request) { return request.url.indexOf("/api/today") !== -1; });
+      if (!hit.length) return null;
+      return cache.match(hit[hit.length - 1]).then(function (response) {
+        return response ? response.json() : null;
+      });
+    });
+  }).then(function (body) {
+    var data = body && body.data;
+    if (!data) return;
+    var sessions = data.sessions || [data];
+    var mine = sessions.filter(function (item) { return item.session_id === id; })[0] || sessions[0];
+    if (!mine || !mine.rows) return;
+    var done = mine.rows.filter(function (row) { return row.done; }).length;
+    document.getElementById("line-rows").textContent = done + " of " + mine.rows.length + " exercises";
+  }).catch(function () { /* the cache is a nicety here; the page is already truthful without it */ });
+})();
+</script>
+</body>
+</html>

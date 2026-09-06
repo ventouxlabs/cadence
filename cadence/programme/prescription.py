@@ -76,7 +76,9 @@ def prescribe(draft: Draft, week: int, load_kg: float | None, cap_kg: float | No
             rpe = min(rpe, rules.rpe_cap)
         amrap = amrap and rules.allow_amrap
         if loaded and cap_kg is not None:
-            notes.append(f"Weight stays at or under {cap_kg:g} kg at this age.")
+            # "Load", never "weight": this line renders on the son's Today screen, where
+            # body-image language is banned outright (D-027, brief "Goals the program must serve").
+            notes.append(f"Load stays at or under {cap_kg:g} kg at this age.")
 
     return Prescription(
         sets=sets,

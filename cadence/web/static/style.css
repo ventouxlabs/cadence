@@ -1,0 +1,344 @@
+/* Cadence - Today. One-handed, on the floor, by a kid, on a cheap Android phone.
+   Every interactive target is at least 56px tall. No webfont, no image, no external request. */
+
+:root {
+  --ink: #12191f;
+  --ink-soft: #4a5560;
+  --paper: #f7f8f9;
+  --card: #ffffff;
+  --line: #ccd3d9;
+  --accent: #1c2733;
+  --accent-ink: #ffffff;
+  --go: #14663a;
+  --go-ink: #ffffff;
+  --tap: 56px;
+  --gap: 10px;
+  --footer-h: 140px;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  padding: 0 0 calc(var(--footer-h) + 16px);
+  background: var(--paper);
+  color: var(--ink);
+  font: 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+}
+.skip:focus {
+  left: 8px;
+  top: 8px;
+  z-index: 5;
+  background: var(--card);
+  padding: 12px;
+}
+
+:focus-visible {
+  outline: 3px solid #0b57d0;
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ top bar */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  height: 52px;
+  padding: 0 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.brand { font-weight: 600; letter-spacing: 0.02em; }
+
+.tabs { display: flex; gap: 4px; }
+
+.tab {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.tab-on { background: var(--accent-ink); color: var(--accent); font-weight: 600; }
+
+.banner {
+  margin: 0;
+  padding: 10px 14px;
+  background: #fff3cd;
+  color: #4a3a00;
+  border-bottom: 1px solid #e0cf94;
+  font-size: 15px;
+}
+
+.notice {
+  margin: 12px;
+  padding: 12px;
+  background: #eef3f7;
+  border-left: 4px solid var(--accent);
+  font-size: 15px;
+}
+
+/* ------------------------------------------------------------------ columns */
+
+.columns { padding: 8px; }
+
+@media (min-width: 768px) {
+  .columns-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+}
+
+.session-head {
+  margin: 12px 4px 4px;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.session-sub {
+  display: block;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
+.group {
+  margin: 16px 4px 6px;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* ---------------------------------------------------------------------- row */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  margin: 0 0 var(--gap);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: var(--tap);
+}
+
+.row-tap {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: var(--tap);
+  padding: 10px 8px 10px 12px;
+  cursor: pointer;
+}
+
+.tick {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  margin: 4px 0 0;
+  accent-color: var(--go);
+}
+
+.row-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.row-name { font-weight: 600; }
+
+.row-line { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.row-cue, .row-note {
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+
+.row-notice { color: #7a3b00; font-weight: 600; }
+
+.row-done { background: #eef1f3; }
+.row-done .row-name, .row-done .row-line { text-decoration: line-through; color: var(--ink-soft); }
+
+.row-tools { display: flex; align-items: flex-start; }
+
+.tool {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 12px;
+}
+
+.tool .clock { display: block; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.tool[aria-pressed="true"] { color: var(--go); font-weight: 700; }
+
+/* ------------------------------------------------------------------ stepper */
+
+.stepper-panel {
+  flex: 1 0 100%;
+  border-top: 1px solid var(--line);
+  padding: 6px 8px 10px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.stepper-label {
+  width: 46px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.step {
+  width: var(--tap);
+  height: var(--tap);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 24px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.step-value {
+  min-width: 74px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------- footer */
+
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+
+.felt { border: 0; margin: 0 0 8px; padding: 0; }
+
+.felt legend { padding: 0 0 6px; font-size: 15px; color: var(--ink-soft); }
+
+.segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+
+.segments form { display: contents; }
+
+.segment {
+  min-height: var(--tap);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.segment[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.done-form { display: block; }
+
+.done {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 19px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.done-promoted { background: var(--go); color: var(--go-ink); font-size: 21px; min-height: 64px; }
+
+.hint { margin: 6px 0 0; font-size: 14px; color: var(--ink-soft); text-align: center; }
+
+.noscript-go {
+  flex: 1 0 100%;
+  min-height: var(--tap);
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+  font-size: 16px;
+}
+
+/* -------------------------------------------------------------------- done */
+
+.summary { padding: 24px 16px; text-align: center; }
+.summary-head { font-size: 26px; margin: 0 0 20px; }
+.summary-card { margin: 0 auto 18px; max-width: 24rem; text-align: left; }
+.summary-who { font-size: 16px; color: var(--ink-soft); margin: 0 0 4px; }
+.summary-line { margin: 6px 0; font-size: 18px; }
+.sync { color: var(--ink-soft); }
+.summary-actions { display: flex; gap: 10px; justify-content: center; margin-top: 24px; }
+
+.action {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* The youth exit inside its own column (Together), and the room the fixed footer needs.
+   `--footer-h` is measured by app.js: two felt strips are twice as tall as one, and a constant
+   here left the last rows under the footer on the Together tab. */
+.exit-form { margin: 12px 0 4px; }
+
+/* The youth exit is its own control, not the shared Done: same tap size, different weight, so
+   nobody reads it as a second "finish everything" button (D-084). */
+.exit {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  border: 2px solid var(--go);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--go);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.exit-promoted { background: var(--go); color: var(--go-ink); font-size: 19px; min-height: 64px; }

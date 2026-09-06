@@ -1,0 +1,19 @@
+{# The youth exit, in that profile's own column. NOT a second Done (D-084).
+
+   Principles section 3.7 P6: the control is always visible and always tappable, and it is
+   promoted once the band's minimum rows are ticked. PRP-02 lines 143/157/161 give Together a
+   single shared Done, and this is not it: it carries `scope=solo`, so it finalises the son's
+   checklist and leaves the parent's open, and it never wears the word "Done" on its own -- the
+   shared button at the foot of the page is the only element with that accessible name. #}
+<form class="exit-form" id="exit-{{ item.profile.id }}"{% if oob %} hx-swap-oob="true"{% endif %}
+      method="post"
+      action="/today/{{ item.record.id }}/done?profile={{ profile_key }}"
+      hx-post="/today/{{ item.record.id }}/done?profile={{ profile_key }}"
+      hx-target="#done-footer" hx-swap="outerHTML">
+  <input type="hidden" name="scope" value="solo">
+  <input type="hidden" name="confirm" value="{{ '1' if confirming or item.all_ticked else '0' }}">
+  <button type="submit" class="exit{% if item.promoted %} exit-promoted{% endif %}"
+          data-session="{{ item.record.id }}" data-scope="solo">
+    {% if item.promoted %}Good enough — I'm done!{% else %}I'm finished for today{% endif %}
+  </button>
+</form>

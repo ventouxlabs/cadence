@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Today · Cadence{% endblock %}
+{% block content %}
+{% if view.missing %}
+<p class="notice">Nothing is planned for {{ view.missing|join(" and ") }} today.</p>
+{% endif %}
+<div class="columns{% if view.together %} columns-two{% endif %}">
+  {% for item in view.sessions %}
+  <section class="session" aria-labelledby="head-{{ item.profile.id }}" data-profile="{{ item.profile.id }}">
+    <h1 class="session-head" id="head-{{ item.profile.id }}">
+      {% if view.together %}{{ item.profile.display_name }} — {% endif %}{{ day_label(item.planned.day_type) }}
+      <span class="session-sub">week {{ item.planned.week }} · {{ view.settings.session_minutes }} min</span>
+    </h1>
+    {% set prelude = item.rows | selectattr("is_prelude") | list %}
+    {% set training = item.rows | rejectattr("is_prelude") | list %}
+    {% if prelude %}
+    <h2 class="group">Prelude</h2>
+    {% for row in prelude %}
+      {% with view = item %}{% include "partials/row.html" %}{% endwith %}
+    {% endfor %}
+    {% endif %}
+    {% if training %}
+    <h2 class="group">Workout</h2>
+    {% for row in training %}
+      {% with view = item %}{% include "partials/row.html" %}{% endwith %}
+    {% endfor %}
+    {% endif %}
+    {% if view.together and item.is_youth %}
+      {% include "partials/exit.html" %}
+    {% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% include "partials/felt.html" %}
+{% endblock %}

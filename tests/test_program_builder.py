@@ -428,7 +428,7 @@ def test_a_row_demotes_when_no_rung_is_legal(library) -> None:
     rows = body_rows(materialise_rows(library.template("lower-a"), 1, profile, settings, library))
     assert rows[0]["exercise_id"] == "bodyweight-squat"
     assert rows[0]["load_kg"] is None
-    assert any("no legal weight" in note for note in rows[0]["notes"])
+    assert any("no legal load" in note for note in rows[0]["notes"])
 
 
 def test_rows_json_carries_the_documented_shape(library, adult_profile: Profile) -> None:
@@ -777,7 +777,7 @@ def test_the_demotion_crosses_a_loaded_link_to_reach_the_floor(library, adult_pr
     settings = DEFAULT_SETTINGS.with_changes(weights_available="")
     main = body_rows(materialise_rows(library.template("upper-a"), 1, adult_profile, settings, library))[0]
     assert main["exercise_id"] == "push-up"
-    assert any("no legal weight" in note or "main lift" in note for note in main["notes"])
+    assert any("no legal load" in note or "main lift" in note for note in main["notes"])
 
 
 def test_a_session_with_no_rows_at_all_refuses_by_name(library, adult_profile: Profile) -> None:

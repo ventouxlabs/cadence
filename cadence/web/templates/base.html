@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c2733">
+<title>{% block title %}Cadence{% endblock %}</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to today</a>
+<header class="topbar">
+  <span class="brand">Cadence</span>
+  <nav class="tabs" aria-label="Profile">
+    {% for key, label in PROFILE_TABS %}
+    <a class="tab{% if key == profile_key %} tab-on{% endif %}" href="/today?profile={{ key }}"
+       {% if key == profile_key %}aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+</header>
+<p class="banner" id="offline-banner" hidden>Saved on this phone — will sync.</p>
+<main id="main">
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

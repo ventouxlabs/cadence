@@ -369,7 +369,7 @@ def _demote_to_bodyweight(draft: Draft, ctx: BuildContext, taken: set[str]) -> D
         origin_id=draft.origin_id,
         exercise=candidate,
         column=sub.retarget(draft.column, draft.exercise, candidate),
-        notes=(*draft.notes, f"{candidate.name} replaces {draft.exercise.name.lower()}: no legal weight."),
+        notes=(*draft.notes, f"{candidate.name} replaces {draft.exercise.name.lower()}: no legal load."),
         assessment_id=draft.assessment_id,
     )
 

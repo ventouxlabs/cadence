@@ -1,0 +1,37 @@
+{# The footer: one "how did that feel" strip per session, and the single shared Done button. #}
+<div id="done-footer" class="footer"{% if oob %} hx-swap-oob="true"{% endif %}>
+  {% for item in view.sessions %}
+  {% if item.all_ticked or confirming %}
+  <fieldset class="felt" id="felt-{{ item.profile.id }}">
+    <legend>How did {% if view.together %}{{ item.profile.display_name }}'s session {% else %}that {% endif %}feel?</legend>
+    <div class="segments" role="radiogroup" aria-label="How did it feel">
+      {% for value, label in [("easy", "Easy"), ("right", "Just right"), ("hard", "Hard")] %}
+      <form method="post" action="/today/{{ item.record.id }}/felt?profile={{ profile_key }}"
+            hx-post="/today/{{ item.record.id }}/felt?profile={{ profile_key }}"
+            hx-target="#done-footer" hx-swap="outerHTML">
+        <button type="submit" name="felt" value="{{ value }}" role="radio" class="segment"
+                data-session="{{ item.record.id }}"
+                aria-checked="{{ 'true' if item.record.felt == value else 'false' }}"
+                {% if item.record.felt == value %}data-on="1"{% endif %}>{{ label }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endif %}
+  {% endfor %}
+  <form method="post" action="/today/{{ view.primary.record.id }}/done?profile={{ profile_key }}"
+        hx-post="/today/{{ view.primary.record.id }}/done?profile={{ profile_key }}"
+        hx-target="#done-footer" hx-swap="outerHTML" class="done-form">
+    <input type="hidden" name="confirm" value="{{ '1' if confirming or all_ticked else '0' }}">
+    <button type="submit" class="done{% if view.primary.promoted %} done-promoted{% endif %}"
+            data-session="{{ view.primary.record.id }}">
+      {% if view.primary.promoted and view.primary.is_youth %}Good enough — done!{% else %}Done{% endif %}
+    </button>
+  </form>
+  {% if confirming and not all_ticked %}
+  <p class="hint">Tap Done again to finish with the rows you have.</p>
+  {# Row posts pull this in with hx-include, so the out-of-band footer they get back knows the
+     user is mid-"Done anyway" and keeps the strip open. #}
+  <input type="hidden" id="confirm-state" name="confirm" value="1">
+  {% endif %}
+</div>

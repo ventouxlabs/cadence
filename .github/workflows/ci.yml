@@ -27,5 +27,4 @@ jobs:
           enable-cache: true
       - run: uv sync --all-extras --dev
       - run: uv run playwright install --with-deps chromium
-      # No end-to-end tests until PRP-02 adds the Today screen.
       - run: uv run pytest tests/e2e --browser chromium -o addopts=""
