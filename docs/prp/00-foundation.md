@@ -60,6 +60,8 @@ Files: `enums.py`, `equipment.py`, `exercise.py`, `workout.py`, `progression.py`
 
 All models: `model_config = ConfigDict(extra="forbid", frozen=True)`. `extra="forbid"` is what makes an imported YAML with a stray key fail closed.
 
+`frozen=True` is shallow, so it is not the whole story (D-037). Sequence fields are `tuple[...]` and mapping fields use a `FrozenMap` annotation that converts to `MappingProxyType` after validation, because `frozen=True` blocks `exercise.tags = [...]` but not `exercise.tags.append(...)`. Every numeric field is `StrictInt` / `StrictFloat` and every boolean `StrictBool`: in lax mode YAML's `true` arrives as `1` and `"12"` as twelve, and a youth load cap must never be compared against a number nobody wrote. `StrictFloat` still accepts an integer, so `load_kg: 12` stays legal.
+
 ### 4.1 Enums — `enums.py`
 
 **Enum member values are exactly `docs/exercise-principles.md` §11.** Do not invent members. Required enums: `AgeBand`, `Pattern`, `Region`, `LoadType`, `LoadUnit`, `Measure`, `Equipment`, `ExerciseTag`, `ProgressionType`, `RegressTrigger`, `AutoregOutcome`, `Felt`, `Readiness`, `SessionStatus`, `GoalType`, `DayType`, `AssessmentId`, `TargetTier`, `GarminCategory`.
@@ -203,7 +205,9 @@ def validate_workout(
 
 Never raises on bad input. A `ValidationError` from Pydantic is caught and flattened into one `ValidationError` per Pydantic error, `code="schema"`, `path` = the joined `loc`.
 
-> **Callers gate on `result.ok`, never on `len(result.errors)`.** Exactly two codes are `severity="warn"` — `youth_rep_ceiling` (V4) and `youth_rpe_exceeded` (V12) — so a perfectly acceptable document can carry entries and still be `ok is True`. PRP-01's loader, `/api/import` and `/api/generate` must all branch on `.ok` — treating any non-empty list as failure would reject valid seed workouts. Test 21 pins this.
+> **Callers gate on `result.ok`, never on `len(result.errors)`.** One code is `severity="warn"` — `youth_band_coerced` — so a document can carry an entry and still be `ok is True`. PRP-01's loader, `/api/import` and `/api/generate` must all branch on `.ok` — treating any non-empty list as failure would reject valid documents. Test 21 pins this.
+>
+> **`youth_rep_ceiling` (V4) and `youth_rpe_exceeded` (V12) are errors, not the warnings principles §3.10 labels them** (D-037). §3.10 describes the *program engine*, which caps the reps and moves on. This validator also gates import and generation, where nothing downstream applies a remedy, so a `u10` row prescribing 100 reps at effort 10 has to fail rather than pass with a note.
 >
 > **`ValidationResult` is a Pydantic model and is therefore always truthy.** `if validate_workout(...): raise` rejects *every* document, valid ones included. PRP-01 currently says "treat any non-empty return as failure", which assumes a list return; the correct call is `if not result.ok: raise`.
 
@@ -217,20 +221,27 @@ Never raises on bad input. A `ValidationError` from Pydantic is caught and flatt
 | `equipment_not_available` | — | error | exercise needs equipment the profile has not enabled |
 | `measure_mismatch` | — | error | row's populated measure field ≠ exercise `measure` |
 | `measure_conflict` | schema | error | zero or ≥2 of reps/seconds/meters/steps set |
+| `load_unit_mismatch` | — | error | loaded row's `load_unit` ≠ the resolved exercise's `load_unit` |
+| `profile_kind_mismatch` | — | error | `target_profile_kind` is neither `both` nor the caller's `profile_kind` |
 | `youth_load_type_not_allowed` | V1 | error | `load_type ∉ allowed_load_types` |
-| `youth_load_exceeded` | V2 | error | `load_kg > effective_cap` for the row's `load_unit` |
+| `youth_load_exceeded` | V2 | error | `load_kg > effective_cap` for the **exercise's** `load_unit` |
+| `youth_load_uncappable` | V2 | error | `load_kg > 0` under a unit the band table cannot cap (`total`, `bodyweight`) |
+| `youth_band_coerced` | — | **warn** | a youth profile carried `age_band = adult`; evaluated as `u10` (§3.8) |
+| `bodyweight_invalid` | — | error | `bodyweight_kg` is not a finite positive number; treated as unknown |
 | `youth_rep_floor` | V3 | error | loaded row `reps < rep_min_loaded` |
-| `youth_rep_ceiling` | V4 | **warn** | `reps > rep_max_*` |
+| `youth_rep_ceiling` | V4 | error | `reps > rep_max_*` (D-037: an error, not §3.10's warn) |
 | `youth_rest_floor` | V5 | error | loaded row `rest_s < min_rest_s_loaded` |
-| `youth_exercise_count` | V6 | error | non-prelude rows > `max_exercises_per_session` |
+| `youth_exercise_count` | V6 | error | rows whose **resolved exercise** is not `is_prelude` > `max_exercises_per_session` |
 | `youth_set_count` | V7 | error | `sets > max_sets_per_exercise` |
 | `youth_banned_tag` | V8 | error | row's exercise carries a tag in `banned_tags` |
-| `youth_session_length` | V9 | error | `estimated_minutes > max_session_minutes` |
+| `youth_session_length` | V9 | error | `max(declared, computed-from-rows) minutes > max_session_minutes` |
 | `youth_amrap_not_allowed` | V10 | error | `row.amrap` and not `allow_amrap` |
 | `youth_banned_goal` | V11 | error | profile goal type in `banned_goal_types` |
-| `youth_rpe_exceeded` | V12 | **warn** | `rpe_target > rpe_cap` |
+| `youth_rpe_exceeded` | V12 | error | `rpe_target > rpe_cap` (D-037: an error, not §3.10's warn) |
 | `requires_anchor_unavailable` | V13 | error | row tagged `requires_anchor` and `has_overhead_anchor is False` |
 | `youth_exercise_not_allowed` | **V14** | error | the exercise's `youth_ok_by_band` denies this band (§5.3) |
+
+Three of those rows close bypasses the first implementation had (D-037). The cap column follows the **exercise's** `load_unit`, never the row's, and a loaded row whose unit the band table cannot cap is an error rather than a pass — otherwise `load_unit: total` bought an uncapped 250 kg. V6 counts rows by the resolved exercise's `is_prelude`, because a row-level flag let a document exempt itself. V9 takes the larger of the declared `estimated_minutes` and the figure computed from the rows (`est_seconds_per_set × sets + rest_s × (sets − 1)`), because the declared number is a claim. On assessment day (`day_type = assessment`) the exemptions are **per row, never per session**: only rows whose resolved exercise carries `assessment_only` step out of V6 and V9, and only those rows escape the `max_effort` ban (§3.4, §10.10). `day_type` is a value the document supplies, so exempting the whole session let sixty rows and two hours through by writing one word. Rows 1 and 2 of §10.10's own battery are not `assessment_only` and are counted normally, which is why the battery still fits `u10`.
 
 **V14 is an addition to principles §3.10's V1–V13 table**, sourced from §9's per-band columns. §9 states those columns are checked in addition to §3's rules, so the check exists; §3.10 simply predates it. Remedy: substitute via `regression_of`.
 
@@ -417,7 +428,7 @@ Numbered; each is a real test name.
 18. `::test_measure_mismatch_flagged` — a `seconds` row against a `measure: reps` exercise → `measure_mismatch`. **Negative.**
 19. `::test_equipment_not_available_flagged` — a dumbbell exercise with `equipment=[bodyweight]` → `equipment_not_available`. **Negative.**
 20. `::test_all_errors_collected_not_short_circuited` — a doc with three distinct faults returns three errors.
-21. `::test_warn_only_result_is_ok` — a doc whose sole finding is `youth_rep_ceiling` (warn) has `ok is True` and one error entry.
+21. `::test_warn_only_result_is_ok` — a doc whose sole finding is `youth_band_coerced` (the one remaining warn) has `ok is True` and one entry.
 22. `::test_validator_never_raises` — parametrised over `None`, `{}`, `[]`, a deeply nested dict and a 1 MB string; each returns a `ValidationResult` with `ok is False`. **Negative.**
 23. `::test_missing_bodyweight_falls_back_to_absolute_cap` — `bodyweight_kg=None` with a pct cap set: no crash, absolute cap applied. **Negative.**
 24. `tests/test_schema_bypass.py::test_off_whitelist_equipment_is_rejected` — parametrised over `"barbell"`, `"machine"`, `"cable"`, `"smith-machine"`, `"resistance-band"`: each fails with `equipment_not_whitelisted` or `schema`. **This case is fixed and must never be relaxed.** **Negative.**

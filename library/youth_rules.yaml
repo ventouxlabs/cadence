@@ -1,0 +1,134 @@
+# Youth rules by age band - the machine-readable form of docs/exercise-principles.md section 3.
+#
+# Values here are LAW: the validator refuses any workout that breaks them, whether it came from
+# the seed library, a pasted import, or the AI generator. Percentages from principles section 3.2
+# are stored as fractions (15% -> 0.15). PRP-01 expands the rest of library/; this file is
+# already complete and matches principles section 3.2 / 3.4 / 3.5 / 7.4 field for field.
+
+u10:
+  band: u10
+  allowed_load_types: [bodyweight, bench_assisted]
+  max_load_kg_per_hand: 0.0
+  max_load_kg_per_implement: 0.0
+  max_load_pct_bw_per_hand: 0.0
+  max_load_pct_bw_per_implement: 0.0
+  rep_min_loaded: null
+  rep_max_loaded: null
+  rep_min_bodyweight: 5
+  rep_max_bodyweight: 15
+  min_rest_s_loaded: 60
+  max_session_minutes: 20
+  max_exercises_per_session: 5
+  max_sets_per_exercise: 2
+  rpe_cap: 6
+  allow_amrap: false
+  allow_max_test: false
+  banned_tags:
+    [
+      max_effort,
+      one_rm,
+      to_failure,
+      plyometric_depth,
+      loaded_spinal_flexion,
+      overhead_loaded,
+      loaded_carry,
+    ]
+  banned_goal_types: [weight, body_fat, appearance]
+  good_enough_done_after_n_exercises: 3
+  assessment_caps:
+    push_up_max: 20
+    dead_hang_s: 90
+    plank_s: 90
+    wall_angel_reach: 3
+    goblet_squat_quality: 5
+    farmer_carry_s: 60
+
+age_10_13:
+  band: age_10_13
+  allowed_load_types: [bodyweight, dumbbell, bench_assisted]
+  max_load_kg_per_hand: 5.0
+  max_load_kg_per_implement: 8.0
+  max_load_pct_bw_per_hand: 0.15
+  max_load_pct_bw_per_implement: 0.20
+  rep_min_loaded: 8
+  rep_max_loaded: 15
+  rep_min_bodyweight: 5
+  rep_max_bodyweight: 20
+  min_rest_s_loaded: 60
+  max_session_minutes: 25
+  max_exercises_per_session: 6
+  max_sets_per_exercise: 3
+  rpe_cap: 7
+  allow_amrap: false
+  allow_max_test: false
+  banned_tags:
+    [
+      max_effort,
+      one_rm,
+      to_failure,
+      plyometric_depth,
+      loaded_spinal_flexion,
+      overhead_loaded,
+    ]
+  banned_goal_types: [weight, body_fat, appearance]
+  good_enough_done_after_n_exercises: 3
+  assessment_caps:
+    push_up_max: 20
+    dead_hang_s: 90
+    plank_s: 90
+    wall_angel_reach: 3
+    goblet_squat_quality: 5
+    farmer_carry_s: 60
+
+age_14_17:
+  band: age_14_17
+  allowed_load_types: [bodyweight, dumbbell, kettlebell, bench_assisted]
+  max_load_kg_per_hand: 12.0
+  max_load_kg_per_implement: 16.0
+  max_load_pct_bw_per_hand: 0.25
+  max_load_pct_bw_per_implement: 0.35
+  rep_min_loaded: 8
+  rep_max_loaded: 15
+  rep_min_bodyweight: 5
+  rep_max_bodyweight: 25
+  min_rest_s_loaded: 75
+  max_session_minutes: 35
+  max_exercises_per_session: 7
+  max_sets_per_exercise: 3
+  rpe_cap: 7
+  allow_amrap: false
+  allow_max_test: false
+  banned_tags:
+    [max_effort, one_rm, to_failure, plyometric_depth, loaded_spinal_flexion]
+  banned_goal_types: [weight, body_fat, appearance]
+  good_enough_done_after_n_exercises: 4
+  assessment_caps:
+    push_up_max: 20
+    dead_hang_s: 90
+    plank_s: 90
+    wall_angel_reach: 3
+    goblet_squat_quality: 5
+    farmer_carry_s: 60
+
+adult:
+  band: adult
+  allowed_load_types: [bodyweight, dumbbell, kettlebell, bench_assisted]
+  max_load_kg_per_hand: null
+  max_load_kg_per_implement: null
+  max_load_pct_bw_per_hand: null
+  max_load_pct_bw_per_implement: null
+  rep_min_loaded: 5
+  rep_max_loaded: 20
+  rep_min_bodyweight: 5
+  rep_max_bodyweight: 40
+  min_rest_s_loaded: 60
+  max_session_minutes: 45
+  max_exercises_per_session: 8
+  max_sets_per_exercise: 4
+  rpe_cap: 8
+  allow_amrap: true
+  allow_max_test: true
+  banned_tags: [one_rm]
+  banned_goal_types: []
+  good_enough_done_after_n_exercises: 1
+  assessment_caps: {}
