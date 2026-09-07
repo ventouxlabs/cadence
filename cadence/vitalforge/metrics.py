@@ -45,6 +45,13 @@ ADULT_METRICS: dict[str, tuple[str, bool]] = {
 # The two series PRP-04's trend line reads, under the key names D-101 fixed.
 SERIES_KEYS: dict[str, str] = {"weight": "weight_kg", "body_fat": "body_fat_pct"}
 
+# Derived, never fetched: VitalForge serves a muscle mass and no percentage at all (D-220).
+MUSCLE_PCT_KEY = "muscle_pct"
+
+# Every series the payload carries. ``_series_of`` whitelists reads against this, so a series the
+# cache stores is one ``read_cached`` hands back rather than one it silently drops.
+PAYLOAD_SERIES_KEYS: tuple[str, ...] = (*SERIES_KEYS.values(), MUSCLE_PCT_KEY)
+
 GRAMS_PER_KG = 1000.0
 SERIES_DAYS = 30
 
@@ -97,14 +104,15 @@ class ProfileMetrics:
     stale: bool = False
     # Only the metrics that actually came back. A youth profile's is always empty.
     latest: dict[str, float] = field(default_factory=dict)
-    # ``{"weight_kg": [[iso_date, kg], ...], "body_fat_pct": [...]}`` - D-101's shape exactly.
+    # ``{"weight_kg": [[iso_date, kg], ...], "body_fat_pct": [...]}`` - D-101's shape exactly,
+    # plus the derived ``muscle_pct`` section 7.5.4's body-composition gap reads (D-220).
     series: dict[str, list[list[Any]]] = field(default_factory=dict)
     readiness: Readiness = field(default_factory=Readiness)
 
     def as_payload(self) -> dict[str, Any]:
         """What goes in ``metrics_cache.payload_json``.
 
-        The two series stay at the top level under D-101's names, because PRP-04's trend reader
+        The series stay at the top level under D-101's names, because PRP-04's trend reader
         already parses them there. The scalars live under ``latest`` so that ``weight_kg`` never
         means two different shapes in one document (D-120).
         """
@@ -210,6 +218,7 @@ async def refresh_metrics(db: Session, profile: Profile, client: VitalForgeClien
     readiness, readiness_ok = _readiness_from(answers.get("readiness"))
     latest: dict[str, float] = {}
     series: dict[str, list[list[Any]]] = {}
+    converted: dict[str, list[list[Any]]] = {}
     usable = 1 if readiness_ok else 0
     for name in names:
         result = answers.get(name)
@@ -222,7 +231,11 @@ async def refresh_metrics(db: Session, profile: Profile, client: VitalForgeClien
             logger.warning("VitalForge answered %r for %r with an unusable body: %s", name, profile.id, exc)
             continue
         usable += 1
-        _absorb(name, points, latest, series)
+        converted[name] = _absorb(name, points, latest, series)
+
+    muscle_pct = _muscle_pct(converted)
+    if muscle_pct:
+        series[MUSCLE_PCT_KEY] = muscle_pct
 
     if not usable:
         # Nothing came back that this code could read: every request failed, or every one of them
@@ -236,16 +249,41 @@ async def refresh_metrics(db: Session, profile: Profile, client: VitalForgeClien
 
 def _absorb(
     name: str, points: list[tuple[str, float]], latest: dict[str, float], series: dict[str, list[list[Any]]]
-) -> None:
-    """One metric's points into the scalar and, for the two trend metrics, the series."""
+) -> list[list[Any]]:
+    """One metric's points into the scalar and, for the two trend metrics, the series.
+
+    Returns the converted ``[[day, value], ...]`` so ``muscle_pct`` can be derived from two of
+    them without converting grams a second time, and without storing a mass series nobody reads.
+    """
     if not points:
-        return
+        return []
     key, in_grams = ADULT_METRICS[name]
     convert = _grams_to_kg if in_grams else (lambda value: value)
-    latest[key] = convert(points[-1][1])
+    pairs: list[list[Any]] = [[day, convert(value)] for day, value in points]
+    latest[key] = pairs[-1][1]
     series_key = SERIES_KEYS.get(name)
     if series_key is not None:
-        series[series_key] = [[day, convert(value)] for day, value in points]
+        series[series_key] = pairs
+    return pairs
+
+
+def _muscle_pct(converted: dict[str, list[list[Any]]]) -> list[list[Any]]:
+    """Muscle as a percentage of bodyweight, for each day both readings exist.
+
+    VitalForge serves a muscle **mass** and no percentage anywhere (contract 2.2), and PRP-06
+    section 5 settled that Cadence derives one rather than inventing a read. A mass alone cannot
+    say whether composition moved: 34 kg of muscle means one thing at 84 kg of bodyweight and
+    something else at 95 kg. Section 7.5.4's gap asks whether muscle percent is flat-or-falling
+    while body fat is flat-or-rising, so the percentage is the series it has to read (D-220).
+
+    A day carrying only one of the two readings is skipped, not interpolated: both come off the
+    same scale on the same morning, so a day missing one is a day the scale did not report, and
+    inventing the other would feed a fabricated point to a least-squares slope.
+    """
+    weights = {day: value for day, value in converted.get("weight", []) if value}
+    return [
+        [day, round(mass / weights[day] * 100, 2)] for day, mass in converted.get("muscle_mass", []) if day in weights
+    ]
 
 
 def _stale_copy(previous: ProfileMetrics | None, profile: Profile, now: datetime) -> ProfileMetrics:
@@ -323,7 +361,7 @@ def _latest_of(payload: dict[str, Any], profile: Profile) -> dict[str, float]:
 def _series_of(payload: dict[str, Any], profile: Profile) -> dict[str, list[list[Any]]]:
     if profile.kind == "youth":
         return {}
-    return {key: payload[key] for key in SERIES_KEYS.values() if isinstance(payload.get(key), list)}
+    return {key: payload[key] for key in PAYLOAD_SERIES_KEYS if isinstance(payload.get(key), list)}
 
 
 def _cached_readiness(payload: dict[str, Any]) -> Readiness:

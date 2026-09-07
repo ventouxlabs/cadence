@@ -7,13 +7,14 @@ muscle mass, and 34 500 kg of muscle renders on the screen without raising anyth
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import httpx
 import pytest
 import respx
 from sqlmodel import Session as DbSession
 
+from cadence.bilan.gaps import BODY_COMP, MIN_TREND_POINTS, body_comp_gap
 from cadence.config import Settings
 from cadence.profils.tables import Profile
 from cadence.vitalforge.client import VitalForgeClient
@@ -58,6 +59,30 @@ async def _refresh(db: DbSession, profile: Profile, settings: Settings):
     return await refresh_metrics(db, profile, VitalForgeClient(settings))
 
 
+def _dated(values: list[float], end: date) -> dict:
+    """A metric body of dated points, one every two days, the last of them on ``end``."""
+    days = [end - timedelta(days=2 * (len(values) - 1 - index)) for index in range(len(values))]
+    return {"data": [{"date": day.isoformat(), "value": value} for day, value in zip(days, values, strict=True)]}
+
+
+def _mock_trending_body_comp(end: date, points: int) -> None:
+    """Every adult metric, with body fat rising and muscle mass falling over ``points`` days.
+
+    Bodyweight is held flat so the derived percentage moves only because the mass does: a falling
+    mass against a falling weight can yield a *rising* percentage, which would leave the gap
+    silent for a reason that has nothing to do with the code under test.
+    """
+    trending = {
+        "weight": [84_000.0] * points,
+        "body_fat": [20.0 + 0.2 * index for index in range(points)],
+        "muscle_mass": [34_500.0 - 100.0 * index for index in range(points)],
+    }
+    for name, value in VALUES.items():
+        body = _dated(trending[name], end) if name in trending else _series(value)
+        respx.get(f"{DASH}/p/jd/api/metrics/{name}").mock(return_value=httpx.Response(200, json=body))
+    respx.get(f"{DASH}/p/jd/api/readiness").mock(return_value=httpx.Response(200, json={"score": 72, "status": "ok"}))
+
+
 async def test_weight_divided_by_1000(live_db, vf_profiles, live_settings) -> None:
     """Test 9. ``metrics/weight`` reads ``weight_history.weight_grams`` (contract 2.2)."""
     _mock_all()
@@ -92,6 +117,92 @@ async def test_the_cached_series_keep_d101s_shape(live_db, vf_profiles, live_set
     assert payload["latest"]["muscle_mass_kg"] == 34.5
 
 
+async def test_the_derived_muscle_pct_lets_the_body_comp_gap_fire(live_db, vf_profiles, live_settings) -> None:
+    """D-220. Section 7.5.4's gap could not fire against a real cache until this series existed.
+
+    Driven through ``refresh_metrics`` rather than a hand-written payload on purpose: every other
+    body-composition test writes ``muscle_pct`` into the cache itself, so all of them stayed green
+    for as long as nothing in the product ever wrote that key. This one fails if the derivation
+    stops happening, which is the whole reason it is here rather than in ``tests/test_gaps.py``.
+    """
+    today = datetime.now(UTC).date()
+    _mock_trending_body_comp(today, MIN_TREND_POINTS + 1)
+
+    await _refresh(live_db, vf_profiles["me"], live_settings)
+
+    payload = json.loads(live_db.get(MetricsCache, "me").payload_json)
+    derived = payload["muscle_pct"]
+    assert len(derived) == MIN_TREND_POINTS + 1
+    assert derived[0][1] == 41.07, "muscle mass over bodyweight, as a percentage"
+    assert derived[-1][1] < derived[0][1], "the percentage has to fall, or the gap is right to stay silent"
+
+    gap = body_comp_gap(live_db, "me", today, is_youth=False)
+    assert gap is not None and gap.test_id == BODY_COMP
+
+
+async def test_a_day_missing_one_reading_is_skipped_not_interpolated(live_db, vf_profiles, live_settings) -> None:
+    """A percentage needs both numbers from the same morning, so an unpaired day yields no point.
+
+    Both directions, and by **date** rather than by count: a length that happens to come out right
+    while the pairing is off by a day would pass a count check and still feed the least-squares
+    slope a point taken from two different mornings (D-220).
+    """
+    today = datetime.now(UTC).date()
+    _mock_trending_body_comp(today, MIN_TREND_POINTS + 1)
+    # One extra weight reading, on a day the scale reported no muscle mass at all.
+    respx.get(f"{DASH}/p/jd/api/metrics/weight").mock(
+        return_value=httpx.Response(200, json=_dated([84_000.0] * (MIN_TREND_POINTS + 2), today))
+    )
+
+    await _refresh(live_db, vf_profiles["me"], live_settings)
+
+    payload = json.loads(live_db.get(MetricsCache, "me").payload_json)
+    assert len(payload["weight_kg"]) == MIN_TREND_POINTS + 2
+    assert len(payload["muscle_pct"]) == MIN_TREND_POINTS + 1
+
+    lonely = payload["weight_kg"][0][0]
+    derived = {day for day, _ in payload["muscle_pct"]}
+    assert lonely not in derived, "a day with a weight and no muscle mass was given a percentage anyway"
+    assert derived == {day for day, _ in payload["weight_kg"][1:]}
+
+
+async def test_a_muscle_reading_without_a_weight_is_skipped_too(live_db, vf_profiles, live_settings) -> None:
+    """The other direction. Dividing by a bodyweight nobody measured is the worse of the two.
+
+    ``_muscle_pct`` keys off the weight series, so this is the case that would fail loudly rather
+    than silently - but only if something asks. Nothing did until now.
+    """
+    today = datetime.now(UTC).date()
+    _mock_trending_body_comp(today, MIN_TREND_POINTS + 1)
+    # One extra muscle-mass reading, on a day the scale reported no bodyweight at all.
+    respx.get(f"{DASH}/p/jd/api/metrics/muscle_mass").mock(
+        return_value=httpx.Response(
+            200,
+            json=_dated([34_500.0 - 100.0 * index for index in range(MIN_TREND_POINTS + 2)], today),
+        )
+    )
+
+    await _refresh(live_db, vf_profiles["me"], live_settings)
+
+    payload = json.loads(live_db.get(MetricsCache, "me").payload_json)
+    assert len(payload["weight_kg"]) == MIN_TREND_POINTS + 1
+    assert len(payload["muscle_pct"]) == MIN_TREND_POINTS + 1, "an unpaired muscle reading was kept"
+    assert {day for day, _ in payload["muscle_pct"]} == {day for day, _ in payload["weight_kg"]}
+    assert all(0.0 < value < 100.0 for _, value in payload["muscle_pct"]), "a percentage that is not one"
+
+
+async def test_the_mass_series_is_never_cached(live_db, vf_profiles, live_settings) -> None:
+    """D-220: the percentage is stored and the mass is not. ``latest`` still answers "how much"."""
+    today = datetime.now(UTC).date()
+    _mock_trending_body_comp(today, MIN_TREND_POINTS + 1)
+
+    await _refresh(live_db, vf_profiles["me"], live_settings)
+
+    payload = json.loads(live_db.get(MetricsCache, "me").payload_json)
+    assert "muscle_mass_kg" not in payload, "a series nothing reads is a series that can go stale unnoticed"
+    assert payload["latest"]["muscle_mass_kg"] > 0
+
+
 async def test_partial_failure_keeps_other_metrics(live_db, vf_profiles, live_settings) -> None:
     """Test 12. One metric 500ing must not blank the other five."""
     _mock_all(failing="body_fat")
@@ -118,6 +229,8 @@ async def test_total_failure_marks_stale_and_keeps_last_payload(live_db, vf_prof
     assert metrics.stale is True
     assert metrics.latest["weight_kg"] == 84.1
     assert metrics.readiness.score == 72
+    # The stale copy carries the series forward wholesale, the derived one included (D-220).
+    assert metrics.series["muscle_pct"] == [["2026-09-05", 41.02], ["2026-09-06", 41.02]]
 
 
 async def test_cache_older_than_six_hours_is_stale(live_db, vf_profiles) -> None:

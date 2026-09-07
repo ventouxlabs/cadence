@@ -128,10 +128,14 @@ def summarise(view: SessionView, sync: str = SYNC_LOCAL) -> Summary:
     )
 
 
-def _finalise_one(db: Session, record: SessionRecord, felt: str | None, finished: datetime) -> None:
-    """Write the end of one session and close its planned row. Never re-finalises."""
+def _finalise_one(db: Session, record: SessionRecord, felt: str | None, finished: datetime) -> bool:
+    """Write the end of one session and close its planned row. Never re-finalises.
+
+    Returns whether this call is the one that finished it, so PRP-07's autoregulation hook fires
+    once per session and not again on a double tap or a replayed queue item.
+    """
     if record.finished_at is not None:
-        return
+        return False
     stamp = finished.isoformat()
     record.finished_at = stamp
     record.duration_min = duration_minutes(record, finished)
@@ -142,6 +146,7 @@ def _finalise_one(db: Session, record: SessionRecord, felt: str | None, finished
     if planned is not None and planned.status != PLANNED_DONE:
         planned.status = PLANNED_DONE
         db.add(planned)
+    return True
 
 
 def set_felt(db: Session, record: SessionRecord, raw: str | None) -> str | None:
@@ -182,15 +187,27 @@ def finish(
     """
     # Imported here, not at module scope: ``cadence.db`` imports ``cadence.seance.tables``, so a
     # top-level import of the integration would close a loop through this package's ``__init__``.
+    from cadence.programme.autoregulation import after_done
     from cadence.vitalforge.writeback import attempt_now, queue_session
 
     chosen = normalise_felt(felt)
     finished = _parse(ts) or datetime.now(UTC)
     members = group_members(db, view.record) if group else [view.record]
+    transitioned: list[SessionRecord] = []
     for member in members:
         # ``felt`` is this session's answer, not the other person's: a shared Done finalises both
         # but nobody gets to say how someone else's session felt.
-        _finalise_one(db, member, chosen if member.id == view.record.id else None, finished)
+        if _finalise_one(db, member, chosen if member.id == view.record.id else None, finished):
+            transitioned.append(member)
+
+    # PRP-07's autoregulation runs here, *before* the write-back is priced and inside the same
+    # transaction, on its own savepoint. It writes the "next time" line onto the session, and
+    # ``payload.notes_for`` reads that line to build the Garmin note (D-129): running it after
+    # the queue would send VitalForge PRP-02's placeholder for ever. The savepoint is what keeps
+    # D-216's promise that a failed nudge cannot take a finished session with it (D-219).
+    for member in transitioned:
+        after_done(db, member, commit=False)
+
     # The write-back job is written in *this* transaction, before the commit. Queuing after it
     # would mean a crash in between leaves a finished session with nothing queued and nothing to
     # notice it: the session reads as done, VitalForge never hears about it, and no screen says

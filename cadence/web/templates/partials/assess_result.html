@@ -1,0 +1,18 @@
+{# What the save produced. Carries the form's id so the HTMX `outerHTML` swap lands here, and
+   reads the same way after a plain POST, which comes back through `/assess?...&saved=1`. #}
+<section id="assess-form" class="card assess-result" data-role="assess-result" aria-live="polite">
+  <h2 class="card-head">Saved.</h2>
+  {% if challenges %}
+  <p class="summary-line">{% if challenges|length == 1 %}One thing{% else %}{{ challenges|length }} things{% endif %} to chase:</p>
+  {% include "partials/challenges.html" %}
+  <p class="summary-line">These now appear in your sessions.</p>
+  {% else %}
+  <p class="summary-line">Nothing to chase this time — every test came back where it should be.</p>
+  {% endif %}
+  {% if capped_count %}
+  <p class="anote" data-capped>
+    {% if capped_count == 1 %}One count{% else %}{{ capped_count }} counts{% endif %} stopped at the cap. That's a win.
+  </p>
+  {% endif %}
+  <a class="action" href="/today?profile={{ profile_key }}">Back to today</a>
+</section>

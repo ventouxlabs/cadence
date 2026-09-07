@@ -1,11 +1,12 @@
 """The "next time" line on the Done screen.
 
-A **placeholder**. PRP-07 owns autoregulation and replaces the body of ``next_time_note`` with the
-real decision (principles section 5.4), keeping this signature: the Done screen, the JSON summary
-and PRP-04's history all call it and none of them should change when the maths arrives.
+PRP-07's real line, kept behind PRP-02's signature (D-071). The autoregulator formats one line
+when it rewrites the next session and stores it on ``session.notes``; this reads it back.
 
-Deliberately says nothing numeric. A made-up "goblet squat 3x10 @ 14 kg" would be indistinguishable
-from a real prescription, and a person following it would be following an invention.
+Reading rather than recomputing is deliberate. The Done screen is re-summarised on every reload,
+and a note rebuilt from the plan would say something different once that plan had been nudged a
+second time. The three placeholder lines survive as the fallback for a session the autoregulator
+never reached - an assessment day, a library that would not load, a queue with nothing after it.
 """
 
 from __future__ import annotations
@@ -20,9 +21,11 @@ PLACEHOLDER_DEFAULT = "Next time: same session, and we will nudge it once a few 
 def next_time_note(session: Any) -> str:
     """One line of advice for the session just finished.
 
-    Reads only ``felt``, which is the one autoregulation input that already exists in PRP-02
-    (principles section 5.3). Anything absent gets the neutral line.
+    The line the autoregulator stored, or a neutral one keyed on ``felt`` when it stored nothing.
     """
+    stored = getattr(session, "notes", None)
+    if isinstance(stored, str) and stored.strip():
+        return stored.strip()
     felt = getattr(session, "felt", None)
     if felt == "easy":
         return PLACEHOLDER_EASY

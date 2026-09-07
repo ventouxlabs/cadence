@@ -598,19 +598,22 @@ async def test_a_resolved_gap_travels_as_a_test_id(
     """And a gap that *is* one of this profile's challenges reaches the prompt as its test id."""
     from sqlalchemy import text as sql_text
 
+    from cadence.bilan.tables import ACTIVE, Challenge
     from cadence.config import get_settings as config_settings
 
+    # Built with the model rather than the raw stand-in table this test used to stand up: PRP-07
+    # now creates ``challenge`` for real, with NOT NULL columns the stand-in never carried.
     with DbSession(get_engine(settings)) as db:
-        db.execute(
-            sql_text(
-                "CREATE TABLE IF NOT EXISTS challenge (id TEXT PRIMARY KEY, profile_id TEXT, name TEXT,"
-                " test_id TEXT, target_value REAL, due_on TEXT, status TEXT, row_json TEXT)"
-            )
-        )
-        db.execute(
-            sql_text(
-                "INSERT INTO challenge (id, profile_id, name, test_id, status)"
-                " VALUES ('c1', 'me', 'Dead hang 60 s', 'dead_hang_s', 'active')"
+        db.add(
+            Challenge(
+                id="c1",
+                profile_id="me",
+                name="Dead hang 60 s",
+                test_id="dead_hang_s",
+                target_value=60.0,
+                baseline_on="2026-09-06",
+                due_on="2026-10-04",
+                status=ACTIVE,
             )
         )
         db.commit()
@@ -630,7 +633,7 @@ async def test_a_resolved_gap_travels_as_a_test_id(
         assert "Dead hang 60 s" not in sent
     finally:
         with DbSession(get_engine(settings)) as db:
-            db.execute(sql_text("DROP TABLE challenge"))
+            db.execute(sql_text("DELETE FROM challenge"))
             db.commit()
 
 

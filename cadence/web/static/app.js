@@ -383,13 +383,14 @@
 
   /* A rejected form still has to render. HTMX swaps 2xx only, so a 422 carrying the settings
      form with its errors in it would be dropped and the user would tap Save and see nothing
-     change. Only the settings form opts in: everywhere else a 4xx really is "do not swap". */
+     change. Only the two forms opt in -- settings, and PRP-07's check-in, which re-renders the
+     same way: everywhere else a 4xx really is "do not swap". */
   document.body.addEventListener("htmx:beforeSwap", function (event) {
     var detail = event.detail || {};
     var status = detail.xhr ? detail.xhr.status : 0;
     var target = event.target;
     if (status !== 422) return;
-    if (!target || !target.closest || !target.closest("#settings-form")) return;
+    if (!target || !target.closest || !target.closest("#settings-form, #assess-form")) return;
     detail.shouldSwap = true;
     detail.isError = false;
   });

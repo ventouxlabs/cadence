@@ -1,0 +1,14 @@
+{# Today's Assessment-day card (PRP-07). Shown while the profile has no battery, and again when
+   the newest one turns 28 days old. `Skip` marks the queued assessment day skipped and moves on;
+   the card comes back with the next session until a baseline is actually recorded. #}
+<section class="assess-card" data-role="assessment-card" aria-labelledby="assess-card-head">
+  <h2 class="assess-card-head" id="assess-card-head">Assessment day</h2>
+  <p class="assess-card-line">Six tests, about 15 minutes.</p>
+  <div class="assess-card-actions">
+    <a class="action" href="/assess?profile={{ view.primary.profile.id }}">Start</a>
+    <form method="post" action="/assess/skip?profile={{ view.primary.profile.id }}">
+      <input type="hidden" name="tab" value="{{ profile_key }}">
+      <button class="action action-quiet" type="submit">Skip</button>
+    </form>
+  </div>
+</section>

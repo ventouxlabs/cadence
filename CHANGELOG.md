@@ -23,6 +23,11 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 - Smoke step 7 is now mode-dependent: `mock` still requires `synced ✓`, while a live run also accepts `will sync` — what a 404 from the undeployed VitalForge endpoint actually renders — and `sync failed (retrying)`, but still fails on the terminal `sync failed` and on `stored locally — VitalForge not configured`.
 - Review Lows: the troubleshooting table warns against a bare `docker inspect cadence`, which prints `Config.Env` and therefore both tokens in full — keep it `--format`-scoped; `backup.sh` refuses a database or backup directory beginning `-` or containing a quote, since `.backup '$OUT'` word-splits and `a' 'b` writes the snapshot outside the directory whose permissions protect it; the Dockerfile no longer claims the uv tag closes reproducibility, `0.11` being a minor tag that still moves; and D-167/D-168 now state the credential-shape threshold as 32 characters, matching the regex.
 - Decisions D-160 to D-169, D-200 to D-209.
+### prp-07 — progression-assess (2026-09-07)
+- Autoregulation (`cadence/programme/{decision,arithmetic,signals,notes,autoregulation}.py`): the full §5.4 decision table (bump/hold/regress/deload), youth bumps reps/time only and never load beyond the band cap, deload week values, `next_time_note`, missed-session hold, a Done-time savepoint isolating a failed nudge from the finished session and its queued VitalForge job.
+- Assessments and challenges (`cadence/bilan/`): baseline/retest flow (self-queuing 28-day reminder, survives a skip), gap detection (adult body-comp via a derived `muscle_pct` series, dead-hang `unavailable` never a gap without an anchor), ≤3 challenge rows woven into Today without colliding on shared day types, youth challenges never mention weight/body/appearance.
+- 3163 tests, 100 Playwright, 92% coverage; the full §5.4 cartesian product (1024 cases) tested against the principles doc.
+
 ### prp-08 — import and AI generation (2026-09-06)
 - `POST /api/import`: JSON text or a multipart file, one pipeline, `source = "import"`. Size (256 KB) is checked on `Content-Length` and again on the read bytes, before the parser; the handler takes a raw `Request` so a body model cannot parse ahead of the gate.
 - One pipeline behind import and accept (`cadence/bibliotheque/import_service.py`), pure with respect to the filesystem: it takes `text: str`, never a path, and an upload's filename is read by nobody (D-010).
@@ -35,6 +40,20 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 - `CADENCE_OMNIROUTE_MODE=mock` returns a canned workout with no key and no network, through every gate, for PRP-09's deploy smoke test (D-180).
 - Missing key: `/api/generate` answers 503 `generation_unavailable`, the card renders one explanatory line, import still works, and neither the key nor its variable name appears in a body or a log line.
 - 89 tests here — `test_import.py` (13), `test_import_hardening.py` (24), `test_generate.py` (22), `test_ia_prompt.py` (6), `test_settings_ai.py` (24) — plus 6 Playwright tests at 390×844; decisions D-170 to D-198.
+
+### prp-07 — autoregulation, deload, assessments, gaps and challenges (2026-09-06)
+- `cadence/programme/decision.py`: principles section 5.4 as an ordered list of `(rule_id, predicate, outcome)`, first match wins, returning the firing rule alongside the outcome so R7 and R11 stay distinguishable (D-212).
+- `cadence/programme/arithmetic.py`: `apply_outcome` — bump, hold, regress and deload, pure and immutable, rounding to the ladder *then* clamping to the band cap, with the youth order of section 5.6 keyed off `allow_load_progression` so load can never rise for a youth profile by any path.
+- `cadence/programme/autoregulation.py`: rewrites the next planned session of the same day type, matching rows by `exercise_id` then position, and stores nothing that `validate_workout` would reject. A session somebody has already ticked is never rewritten under them.
+- `cadence/programme/signals.py`: readiness from `metrics_cache` (absent, malformed or unknown all read `unknown`, never `low`), `missed_sessions_7d` windowed from the first completed session, and the fourteen-day comeback that restarts the block at week 1 with every load × 0.90.
+- Real `next_time_note`: the autoregulator formats one line in the household's display unit and stores it on `session.notes`, so a reload of the Done screen shows the same advice (D-071 closed).
+- Done hook: `seance.done.finish` calls `programme.autoregulation.after_done` once per session that actually transitioned, after the commit, and a failure logs rather than breaking Done (D-216).
+- `cadence/bilan/`: the `assessment` and `challenge` tables, the six-test battery with youth values capped **on save**, gap detection to section 7.5 (unavailable never a gap, ranked by severity, adult-only `body_comp` last and only with ten cached points), and at most three named challenges per profile.
+- `GET|POST /api/assessments` and `GET|POST /assess?profile=`: six tests at 390 px, segmented controls for the two self-rated ones, youth play phrasing verbatim, the dead hang shown `unavailable` without an overhead anchor, and steppers of 1 for reps and scores and 5 for seconds.
+- Challenge rows: section 7.7's row appended to the stored `rows_json` of matching sessions, `is_challenge = true`, run through `fit_to_band` so P5 holds and the challenge row is still the first thing dropped; the wall-angel challenge extends the prelude instead and is suppressed on assessment day.
+- "Assessment day" card on Today until a baseline exists and every 28 days after, with a Skip that marks the session skipped and brings the card back.
+- Youth challenge names never mention weight, body or appearance: the fixed play phrase plus a count or a duration, proven across all six tests at all three bands.
+- Decisions **D-210 to D-227**. Numbering note: written as D-130 to D-138, renumbered to D-190..D-198 when PRP-06 took D-120..D-141, and renumbered again to D-210..D-227 when PRP-08 and PRP-09 merged ahead of this branch and PRP-08 had published in D-190..D-198. See the Phase 7 note in `docs/DECISIONS.md`.
 
 ### prp-03 — profiles, Setup, Settings and the youth wiring (2026-09-06)
 - `cadence/profils/` services over PRP-01's tables: `get_settings` / `update_settings`, `get_profile` / `update_profile`, `apply_household` (one form, one transaction), `youth_ruleset_for`, `has_overhead_anchor`, `bodyweight_kg`, `refresh_age_bands` on boot.

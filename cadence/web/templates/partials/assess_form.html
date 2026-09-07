@@ -1,0 +1,69 @@
+{# The six blocks of the PRP-07 wireframe, in `FORM_ORDER`.
+
+   Two kinds of control and nothing else: a segmented radio group for the two self-rated tests,
+   and a `[ - ] value [ + ]` stepper over a real number input for the four measured ones. The
+   stepper buttons are the only thing here that needs JavaScript, and the box is typed into and
+   posted without them. #}
+<form id="assess-form" class="assess" method="post" action="/assess?profile={{ profile_key }}"
+      hx-post="/assess?profile={{ profile_key }}" hx-target="#assess-form" hx-swap="outerHTML">
+
+  {% if error %}
+  <p class="form-error" role="alert" data-form-error>⚠ {{ error }}</p>
+  {% endif %}
+
+  {% for field in tests %}
+  <section class="card acard" data-test-block="{{ field.test_id }}" aria-labelledby="head-{{ field.test_id }}">
+    <h2 class="card-head" id="head-{{ field.test_id }}">
+      <span class="anum">{{ loop.index }}</span>
+      <span data-test-name>{{ field.name }}</span>
+    </h2>
+
+    {% if field.unavailable %}
+    {# D-019. No anchor means no dead hang, and an untaken test is stored as unavailable rather
+       than as a zero - so the block offers the checkbox and no number at all. #}
+    <p class="anote anote-warn">⚠ No bar or beam set up.</p>
+    <label class="acheck" data-unavailable>
+      <input type="checkbox" name="unavailable_{{ field.test_id }}" value="1" checked>
+      <span>Mark unavailable</span>
+    </label>
+
+    {% elif field.self_rated %}
+    <div class="segmented" role="radiogroup" aria-labelledby="head-{{ field.test_id }}">
+      {% for choice in field.choices %}
+      <label class="seg{% if choice == field.default %} seg-on{% endif %}">
+        <input type="radio" name="value_{{ field.test_id }}" value="{{ choice }}"
+               {% if choice == field.default %}checked{% endif %}>
+        <span>{{ choice }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    {% if field.rubric %}
+    <ul class="rubric">
+      {% for score, text in field.rubric %}
+      <li><b>{{ score }}</b> = {{ text }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% else %}
+    <div class="astepper" data-stepper>
+      <button class="astep" type="button" data-step="-{{ field.step }}"
+              aria-label="Fewer, {{ field.name }}">−</button>
+      <input class="avalue" type="number" inputmode="numeric" name="value_{{ field.test_id }}"
+             id="value-{{ field.test_id }}" value="{{ field.default }}"
+             min="{{ field.minimum }}" max="{{ field.maximum }}" step="{{ field.step }}"
+             aria-label="{{ field.name }}">
+      <button class="astep" type="button" data-step="{{ field.step }}"
+              aria-label="More, {{ field.name }}">+</button>
+      {% if field.unit_label %}<span class="aunit">{{ field.unit_label }}</span>{% endif %}
+    </div>
+    {% if field.cap %}
+    {# Section 7.4: the cap is the protocol, applied on save, so the screen says so up front. #}
+    <p class="anote" data-cap>Stops at {{ field.cap }}. That's a win.</p>
+    {% endif %}
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <button type="submit" class="asave">Save check-in</button>
+</form>

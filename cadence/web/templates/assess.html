@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Check-in · Cadence{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/static/assess.css">
+<script src="/static/assess.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page">
+  <h1 class="page-head">Check-in</h1>
+  <p class="page-sub">Six quick tests. Once every 4 weeks.</p>
+  {% if result %}
+  {% include "partials/assess_result.html" %}
+  {% else %}
+  {% include "partials/assess_form.html" %}
+  {% endif %}
+</div>
+{% endblock %}

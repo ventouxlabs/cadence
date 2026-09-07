@@ -9,6 +9,7 @@
 {% if view.missing %}
 <p class="notice">Nothing is planned for {{ view.missing|join(" and ") }} today.</p>
 {% endif %}
+{% if assessment_due %}{% include "partials/assessment_card.html" %}{% endif %}
 <div class="columns{% if view.together %} columns-two{% endif %}">
   {% for item in view.sessions %}
   <section class="session" aria-labelledby="head-{{ item.profile.id }}" data-profile="{{ item.profile.id }}">

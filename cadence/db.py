@@ -15,10 +15,13 @@ from fastapi import Depends
 from sqlalchemy import Engine, event
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
+from cadence.bilan.tables import Assessment as Assessment  # noqa: F401
+from cadence.bilan.tables import Challenge as Challenge  # noqa: F401
 from cadence.config import Settings, get_settings
 
 # Imported for their side effect: a table class has to be imported before
-# ``SQLModel.metadata.create_all`` can see it. PRP-01 added four, PRP-02 two more, PRP-04 one, PRP-06 one.
+# ``SQLModel.metadata.create_all`` can see it. PRP-01 added four, PRP-02 two more, PRP-04 one,
+# PRP-06 one, PRP-07 two.
 from cadence.profils.tables import Profile as Profile  # noqa: F401
 from cadence.profils.tables import Setting as Setting  # noqa: F401
 from cadence.programme.tables import PlannedSession as PlannedSession  # noqa: F401

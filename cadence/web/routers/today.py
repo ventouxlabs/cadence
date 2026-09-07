@@ -13,9 +13,10 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlmodel import Session
 
+from cadence.bilan.service import card_due, ensure_retest_queued
 from cadence.config import Settings, get_settings
 from cadence.db import get_session
-from cadence.seance.catalog import display_unit, load_settings
+from cadence.seance.catalog import display_unit, library_bundle, load_settings
 from cadence.seance.done import finish, group_members, is_finished, set_felt, summarise
 from cadence.seance.tables import SessionRecord
 from cadence.seance.ticks import TickError, adjust, set_done
@@ -47,7 +48,11 @@ def _is_htmx(request: Request) -> bool:
 
 
 def _today_context(
-    request: Request, view: TodayView, confirming: bool = False, db: Session | None = None
+    request: Request,
+    view: TodayView,
+    confirming: bool = False,
+    db: Session | None = None,
+    assessment_due: bool = False,
 ) -> dict[str, Any]:
     """Promotion is per session (``item.promoted``), never per page: see ``SessionView``."""
     return {
@@ -58,6 +63,8 @@ def _today_context(
         "all_ticked": all(item.all_ticked for item in view.sessions),
         "confirming": confirming,
         "nudge": readiness_nudge(db, view) if db is not None else None,
+        # PRP-07's Assessment-day card, for the primary session's profile only.
+        "assessment_due": assessment_due,
     }
 
 
@@ -103,7 +110,18 @@ def today_page(
         view = resolve_today(db, profile)
     except TodayError as exc:
         return _error_page(request, str(exc), 404)
-    context = _today_context(request, view, confirming=confirm == "1", db=db)
+    # Section 7's four-weekly retest. A write in a GET, deliberately and narrowly: the card is
+    # gated on an assessment day being queued, and the only moment that can be known is when
+    # somebody looks at Today on or after the due date. It is a no-op on every render but the
+    # first one past that date (D-226). ``card_due`` itself stays a pure read.
+    library = library_bundle()
+    if library is not None and ensure_retest_queued(db, view.primary.profile, library, load_settings(db)) is not None:
+        # The retest went in ahead of what was just resolved, so resolve again: the card and the
+        # session rendered underneath it have to be the same day (D-218b).
+        view = resolve_today(db, profile)
+    context = _today_context(
+        request, view, confirming=confirm == "1", db=db, assessment_due=card_due(db, view.primary.profile)
+    )
     return templates.TemplateResponse(request, "today.html", context)
 
 

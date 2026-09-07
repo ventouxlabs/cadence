@@ -1,0 +1,14 @@
+{# The active challenges, as a short list.
+
+   Every name element carries `data-challenge-name`: the youth banned-word check in
+   `tests/e2e/test_setup.py` keys on that attribute, and a name rendered without it would leave a
+   section 3.5 breach invisible to the suite that exists to catch one. #}
+{% if challenges %}
+<ul class="challenges" data-role="challenges">
+  {% for challenge in challenges %}
+  <li class="challenge">
+    <span class="challenge-name" data-challenge-name>{{ challenge.name }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

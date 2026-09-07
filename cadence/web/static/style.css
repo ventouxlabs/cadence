@@ -401,3 +401,23 @@ a.brand {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* --------------------------------- the Assessment-day card (PRP-07)
+   Here rather than in assess.css because the card renders on Today, which loads this file and
+   only this file. One appended block, so the diff against PRP-02's stylesheet is one hunk. */
+
+.assess-card {
+  margin: 8px 8px 0;
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+}
+.assess-card-head { margin: 0 0 4px; font-size: 18px; }
+.assess-card-line { margin: 0 0 10px; color: var(--ink-soft); }
+.assess-card-actions { display: flex; gap: 10px; }
+.assess-card-actions form { display: flex; flex: 1 1 0; }
+.assess-card-actions .action { flex: 1 1 0; justify-content: center; }
+
+.action-quiet { width: 100%; font: inherit; color: var(--ink-soft); cursor: pointer; }

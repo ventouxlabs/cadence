@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from cadence.programme.arithmetic import apply_outcome
 from cadence.programme.bands import age_band, band_for_age, effective_cap, week_of_block
 from cadence.programme.builder import ProgramPlan, build_program, program_id
+from cadence.programme.decision import AutoregInput, Decision, decide
 from cadence.programme.ladder import (
     WeightsAvailable,
     parse_weights_available,
@@ -16,14 +18,18 @@ from cadence.programme.schemes import row_budget, week_day_types, workout_id_for
 from cadence.programme.tables import PlannedSession, Program
 
 __all__ = [
+    "AutoregInput",
+    "Decision",
     "PlannedSession",
     "Program",
     "ProgramPlan",
     "WeightsAvailable",
     "age_band",
+    "apply_outcome",
     "band_for_age",
     "build_program",
     "compile_workout",
+    "decide",
     "effective_cap",
     "estimated_minutes",
     "materialise_rows",

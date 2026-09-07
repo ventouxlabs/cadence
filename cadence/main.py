@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.gzip import GZipMiddleware
 
+from cadence.api import assessments as api_assessments
 from cadence.api import generate as api_generate
 from cadence.api import health, mock_inspect, profiles, sessions
 from cadence.api import history as api_history
@@ -30,6 +31,7 @@ from cadence.vitalforge.periodic import periodic_sync
 from cadence.web.gate import SetupRequired, require_setup, setup_redirect
 from cadence.web.guards import RequestRefused, refusal_response
 from cadence.web.rendering import STATIC_DIR
+from cadence.web.routers import assess as web_assess
 from cadence.web.routers import history as web_history
 from cadence.web.routers import pwa
 from cadence.web.routers import settings as web_settings
@@ -44,6 +46,7 @@ ROUTERS: list[APIRouter] = [
     profiles.router,
     sessions.router,
     api_history.router,
+    api_assessments.router,
     api_import.router,
     api_generate.router,
     api_metrics.router,
@@ -60,7 +63,7 @@ ROUTERS: list[APIRouter] = [
 # PRP-04's History is on it for the same reason Today is: it renders the son's sessions, and a
 # profile whose age has never been asked for has been training against the strictest defaults, so
 # the screen would be showing work done under rules nobody chose.
-GATED_ROUTERS: list[APIRouter] = [web_today.router, web_history.router]
+GATED_ROUTERS: list[APIRouter] = [web_today.router, web_history.router, web_assess.router]
 
 # D-025: the one middleware in this app. Vendored HTMX is ~50 KB raw and ~17 KB gzipped, so the
 # 60 KB budget for /today (architecture section 5) is unreachable without it. 500 bytes is the

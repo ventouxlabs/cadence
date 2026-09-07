@@ -70,3 +70,11 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Devil's-advocate: 2 Highs (mock/schema example hardcoded "adult", breaking youth generation) + Mediums fixed; a full independent re-review found 1 Medium (unbounded body read on two settings routes) + 5 Lows, all fixed.
 - Final: 1945 passed, 95 e2e, 94% coverage, lint clean.
 - Squash-merged to main, tagged prp-08, pushed.
+
+## prp-07 — progression-assess — 2026-09-07 (worktree, parallel with 08/09, merged last)
+- Implementer built autoregulation, assessments, gaps, challenges (78 tests, 4 e2e); merged main (PRP-06) after a session-limit interruption, derived a muscle_pct series PRP-06 didn't provide.
+- Tester added the full §5.4 cartesian product (1024 cases) plus wiring tests (2866 total); found the retest reminder never re-appears after baseline (spec deviation).
+- Reviewer: 1 High (two same-day-type challenges could evict each other) + 4 Mediums fixed; retest-reminder fix added self-queuing (28-day, skip-safe); re-verify APPROVE.
+- Merged main (PRP-08/09): resolved a decision-number range collision (renumbered D-190..D-207 to D-210..D-227) and fixed 4 tests whose hand-rolled `challenge` fixtures predated PRP-07's real table.
+- Final: 3163 passed, 100 e2e, 92% coverage, lint clean.
+- Squash-merged to main, tagged prp-07, pushed. All eleven PRPs now merged.

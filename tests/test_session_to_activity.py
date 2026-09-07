@@ -150,7 +150,9 @@ async def test_full_session_posts_exact_activity_json(live_db, planned, live_cli
         "start": body["start"],
         "duration_min": body["duration_min"],
         "exercises": EXPECTED_EXERCISES,
-        "notes": "felt: right · Next time: same session, and we will nudge it once a few are logged.",
+        # PRP-07 landed, so the note is the autoregulator's real line rather than PRP-02's
+        # placeholder. D-129 said this assertion would move when it did (D-219).
+        "notes": "felt: right · Next time: same again — nail the tempo.",
         "source": "cadence",
         "push_to_garmin": True,
     }
@@ -170,7 +172,9 @@ async def test_the_son_pushes_only_when_the_setting_says_so(live_db, planned, li
         "start": body["start"],
         "duration_min": body["duration_min"],
         "exercises": EXPECTED_EXERCISES,
-        "notes": "felt: right · Next time: same session, and we will nudge it once a few are logged.",
+        # PRP-07 landed, so the note is the autoregulator's real line rather than PRP-02's
+        # placeholder. D-129 said this assertion would move when it did (D-219).
+        "notes": "felt: right · Next time: same again — nail the tempo.",
         "source": "cadence",
         "push_to_garmin": True,
         "garmin_target": "credential_person",
