@@ -1,0 +1,19 @@
+# VM-201 overlay. Used as:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# `build` is deliberately not overridden here: the deploy builds from the rsynced tree, and
+# nulling it would fight the --build in the command above.
+
+services:
+  cadence:
+    logging:
+      driver: json-file
+      options:
+        # The point of this overlay. An unrotated json-file log fills VM-201's disk and takes
+        # VitalForge down with Cadence, since the two share the host.
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M

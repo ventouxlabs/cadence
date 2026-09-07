@@ -1,0 +1,18 @@
+# Workstation overlay, used by `make dev-docker`:
+#   podman-compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# It exists so the base file can state production's values plainly rather than hiding them
+# behind shell defaults. The mode is deliberately NOT declared in the base file: `environment:`
+# wins over `env_file:`, so declaring it there would silently override whatever the operator
+# put in the VM's .env.
+
+services:
+  cadence:
+    environment:
+      # dev, not prod: settings validation refuses any *_MODE=mock under prod (D-139), and mock
+      # is exactly what a local smoke run needs.
+      CADENCE_ENV: dev
+      # No socket is opened and no Garmin activity is created. It also mounts
+      # /api/_mock/activities, which scripts/smoke.sh uses to prove the write-back recorded
+      # exactly one activity for the session it just finished (D-169).
+      CADENCE_VITALFORGE_MODE: mock

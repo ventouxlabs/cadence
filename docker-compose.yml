@@ -1,0 +1,46 @@
+# Base compose file. Docker-compatible subset only (D-004): the workstation runs
+# podman-compose and VM-201 runs Docker Compose, and a podman-only key would make the deploy
+# fail in a way the workstation never reproduces.
+#
+# There is no healthcheck stanza here on purpose - it lives in the Dockerfile, following
+# VitalForge's own shape on this host (contract section 1.7).
+
+services:
+  cadence:
+    build: .
+    image: cadence:local
+    container_name: cadence
+    restart: unless-stopped
+    ports:
+      # Host 8090 is what Nginx Proxy Manager forwards to. The container always listens on 8000.
+      #
+      # The bind address is a variable and the mapping stays a *single* entry, because compose
+      # appends `ports` across -f files rather than overriding them: a restricted mapping added
+      # in an overlay would publish both, leaving 0.0.0.0 open and colliding on the port (D-206).
+      # Default 0.0.0.0 keeps today's behaviour; set CADENCE_BIND_ADDR to VM-201's Tailscale
+      # address in the VM's .env to stop LAN clients reaching Cadence past NPM's access list.
+      - "${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000"
+    # Secrets live only here. .env is git-ignored; .env.example is committed with blank tokens.
+    env_file: .env
+    environment:
+      # Explicit, and therefore ahead of whatever CADENCE_DB_PATH the operator's .env carries:
+      # .env.example ships the relative `data/cadence.db`, which happens to resolve under
+      # WORKDIR /app but only by luck, and a copied-in .env from another machine need not.
+      CADENCE_DB_PATH: /app/data/cadence.db
+      # Production. `make dev-docker` flips this to dev through docker-compose.dev.yml,
+      # because settings validation refuses a mock integration under prod (D-139).
+      CADENCE_ENV: prod
+      # CADENCE_VITALFORGE_MODE is deliberately absent: it belongs to the operator's .env,
+      # and an `environment:` entry here would override it.
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      # A bind mount, not a named volume: a backup and a restore are then ordinary file
+      # operations on the host. The host directory must be owned by uid 10001 - see docs/deploy.md.
+      #
+      # `:Z` relabels the directory for this container on an SELinux host. Without it the
+      # workstation's container dies at startup with `unable to open database file` even after
+      # the chown, which reads exactly like the ownership problem and is not it. Docker accepts
+      # the option and ignores it where SELinux is not enforcing, so VM-201 is unaffected
+      # (D-004 keeps these files in the Docker-compatible subset). `:Z` and not `:z`: the label
+      # is private to Cadence, and `./data` is shared with nothing.
+      - ./data:/app/data:Z

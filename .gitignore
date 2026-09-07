@@ -11,7 +11,13 @@ htmlcov/
 coverage.xml
 
 # Secrets & local data
-.env
+#
+# `.env*`, not `.env`: the dotenv convention spreads (.env.local, .env.production, .env.vm-201),
+# and a variant that is not listed is tracked silently - the failure only shows up once a real
+# VITALFORGE_TOKEN is already in the history. The allow-list entry below is what keeps the one
+# file that must stay tracked (D-205). .dockerignore already covered both forms.
+.env*
+!.env.example
 data/*.db
 data/*.db-journal
 data/*.db-wal

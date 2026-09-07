@@ -1,0 +1,431 @@
+# Deploying Cadence to VM-201
+
+Cadence runs as one container on VM-201 (`192.168.1.21`), published on host port **8090**,
+fronted by Nginx Proxy Manager at `https://cadence.grepon.cc`, reachable over Tailscale only.
+
+> **These deployment facts are operator knowledge, not repo facts.** VM-201, Nginx Proxy
+> Manager, Tailscale and `*.grepon.cc` appear nowhere in the VitalForge tree, whose sample
+> nginx config uses `yourdomain.com` placeholders. Everything below comes from the brief's
+> "Known environment" block. Confirm it on the first deploy rather than trusting it.
+
+| | |
+|---|---|
+| Container listens on | `0.0.0.0:8000` (uvicorn, one worker) |
+| Host publishes | `8090` → `8000` |
+| Container user | uid **10001** (`cadence`), non-root |
+| Database | `./data/cadence.db` on the host, `/app/data/cadence.db` in the container |
+| Backups | `./data/backups/cadence-YYYYmmdd-HHMM.db`, newest 30 kept |
+| Public name | `cadence.grepon.cc` → `192.168.1.21:8090` |
+
+---
+
+## 1. Prerequisites
+
+On **VM-201**:
+
+- Docker Engine with the Compose plugin (`docker compose version`).
+- `sqlite3` is optional. The backup script prefers the CLI and falls back to Python's
+  `sqlite3` module, which is how it runs inside the container, where there is no CLI. Both
+  call the same SQLite Online Backup API.
+- Tailscale up and the host reachable on its Tailscale address.
+- Nginx Proxy Manager already running (it fronts VitalForge on the same host).
+- A directory at `/opt/cadence`, writable by the deploying user.
+
+On the **workstation**:
+
+- An ssh host alias `vm-201` in `~/.ssh/config` with key auth. `scripts/deploy.sh` checks this
+  first with `ssh -o BatchMode=yes` and refuses to start if it fails. Override the alias with
+  `CADENCE_DEPLOY_HOST`, and the remote directory with `CADENCE_DEPLOY_PATH`.
+- **Passwordless sudo for that user on VM-201**, for the one `chown -R 10001:10001 data` the
+  deploy runs over ssh. A sudo password prompt on a non-interactive ssh hangs the deploy
+  halfway through, which is exactly the failure the BatchMode check exists to prevent. If
+  passwordless sudo is not wanted, chown `data/` once by hand and run
+  `scripts/deploy.sh --no-build` past it, or make the deploying user own `data/`.
+- `rsync`, and `jq` for `make smoke`.
+- Podman and `podman-compose` for `make dev-docker` (D-004: this workstation aliases
+  `docker` → `podman`; VM-201 runs real Docker Compose).
+
+---
+
+## 2. First deploy
+
+```bash
+# On VM-201, once.
+sudo mkdir -p /opt/cadence && sudo chown "$USER" /opt/cadence
+```
+
+Ship the code, then create the secrets file **by hand**. `.env` is never rsynced, never
+committed, and never baked into the image. **Order matters:** `env_file: .env` makes Compose
+refuse to start when the file is absent, so the first `make deploy` gets as far as the rsync
+and then fails at `up`. That is expected on a first deploy, and it is why `.env` comes between
+the two:
+
+```bash
+# 1. Workstation - ships the tree, then stops at `up` with a missing .env
+make deploy
+
+# 2. VM-201, once: create .env from the committed template and fill in the real tokens
+cd /opt/cadence
+cp .env.example .env
+chmod 600 .env
+${EDITOR:-nano} .env                # VITALFORGE_TOKEN, OMNIROUTE_KEY, the two person slugs
+
+# 3. Workstation - now it completes
+make deploy
+```
+
+`scripts/deploy.sh` creates `data/` and `data/backups/` and chowns them to uid 10001 before
+bringing the stack up. Doing it by hand instead:
+
+```bash
+mkdir -p /opt/cadence/data/backups
+sudo chown -R 10001:10001 /opt/cadence/data
+```
+
+**Why 10001.** The container runs non-root, and a bind mount that compose created is owned by
+root, so the app fails at startup with `unable to open database file`. VitalForge solves the
+same problem with an entrypoint that `chown`s `/app/data` as root and then drops privileges.
+Cadence does not, deliberately: a bind mount the operator owns is an ordinary directory to back
+up, copy and restore, and the ownership is a one-line first-deploy step rather than a root
+capability the container keeps forever.
+
+Seed the library and the two profiles on the first boot:
+
+```bash
+docker compose exec cadence python -m cadence.bibliotheque.seed
+```
+
+Then confirm, before touching Nginx Proxy Manager:
+
+```bash
+docker compose ps                            # STATUS must say (healthy), not just Up
+docker exec cadence id -u                    # 10001
+curl -s http://192.168.1.21:8090/api/health | jq .
+```
+
+### Local dry run first
+
+```bash
+make dev-docker      # podman-compose with the dev overlay, on http://localhost:8090
+make smoke           # eight steps against localhost
+```
+
+`make dev-docker` layers `docker-compose.dev.yml`, which sets `CADENCE_ENV=dev` and
+`CADENCE_VITALFORGE_MODE=mock`. The base file states production's values (`CADENCE_ENV=prod`)
+and deliberately leaves the mode to the VM's `.env`, because a compose `environment:` entry
+overrides `env_file:` and would silently ignore what the operator wrote there.
+
+`make dev-docker` runs `podman unshare chown -R 10001:10001 data` before starting. Rootless
+podman maps container uid 10001 to a high subuid on the host, so the plain `chown` VM-201 uses
+does not apply on the workstation and the container would hit the same `unable to open database
+file`.
+
+---
+
+## 3. Routine deploy
+
+```bash
+make deploy                       # rsync mode (default)
+make deploy DEPLOY_MODE=git       # git pull --ff-only on the VM instead
+```
+
+| | rsync (default) | git |
+|---|---|---|
+| Ships | the working tree, unpushed branches included | whatever `origin` has |
+| Pro | deploys exactly what is on the workstation | the VM's state is an auditable git ref |
+| Con | the VM's state is not a commit | needs the commit pushed first |
+
+rsync is the default because PRP-05's VitalForge branch is deliberately never pushed (D-005)
+and there will be things to try before pushing. `--mode git` needs a clone at `/opt/cadence`
+with a remote and a checked-out branch.
+
+The rsync carries `--delete` and therefore two load-bearing excludes:
+
+- `--exclude '.env'` — without it, the VM's real tokens are wiped and Done starts reporting
+  `stored locally — VitalForge not configured`.
+- `--exclude 'data'` — without it, `--delete` removes the production database.
+
+Both live in `scripts/deploy.sh` so they are never typed by hand. `make deploy` twice in a row
+must leave `data/` and `.env` untouched; that is one of the manual checks in §10.
+
+### Upgrading
+
+An upgrade is a routine deploy: `git pull` on the workstation, `make deploy`, then
+`make smoke BASE=https://cadence.grepon.cc`. The image is rebuilt on the VM by
+`docker compose up -d --build`; there is no registry and no image push. Take a backup first if
+the release touches the schema:
+
+```bash
+ssh vm-201 'cd /opt/cadence && ./scripts/backup.sh'
+```
+
+### Log locations
+
+| What | Where |
+|---|---|
+| Application log | `docker compose logs -f cadence` on VM-201 |
+| Rotated files | `/var/lib/docker/containers/<id>/<id>-json.log`, 10 MB × 3 (prod overlay) |
+| Backup cron log | `/var/log/cadence-backup.log` |
+| Health state | `docker inspect --format '{{json .State.Health}}' cadence \| jq .` |
+
+---
+
+## 4. Nginx Proxy Manager — `cadence.grepon.cc`
+
+New Proxy Host:
+
+| Field | Value |
+|---|---|
+| Domain Names | `cadence.grepon.cc` |
+| Scheme | `http` |
+| Forward Hostname / IP | `192.168.1.21` |
+| Forward Port | `8090` (the **host** port, not the container's 8000) |
+| Cache Assets | **off** |
+| Block Common Exploits | **on** |
+| Websockets Support | **off** |
+| SSL | request a Let's Encrypt certificate, Force SSL on, HTTP/2 on |
+| Access List | optional, §5 |
+
+Advanced tab, one directive:
+
+```nginx
+client_max_body_size 5m;
+```
+
+`/api/import` accepts a pasted or uploaded YAML/JSON workout. NPM's default limit is 1 MB and a
+larger paste fails as a 413 that reads like an app bug. 5 MB, not 25 MB — a workout document is
+kilobytes, and a wider limit is needless upload surface. This follows VitalForge's own
+precedent of raising the limit only for its import path.
+
+**Cache Assets is off** because the service worker already caches Today; a proxy cache on top
+of it serves a stale checklist after a deploy, from a layer neither the app nor the browser can
+invalidate. **Websockets is off** because Cadence is HTMX over plain HTTP and has none.
+
+---
+
+## 5. Tailscale and access
+
+**Cadence has no login of its own (D-009).** A login screen makes Today slower for a kid on the
+floor, and the brief's security boundary is the homelab. The consequence is plain: anything
+that can reach `cadence.grepon.cc` can read both profiles and write sessions.
+
+Guards, in order of preference:
+
+1. **Do not expose 8090 beyond the LAN; reach the host over Tailscale.** This is the baseline
+   and is already true — there is no port forward from the internet.
+2. **Add an NPM Access List** on the proxy host allowing the Tailscale CGNAT range
+   `100.64.0.0/10` and denying everything else. This is the recommended addition and costs one
+   form. **Then verify a denial:** request from a non-Tailscale LAN address and confirm a 403.
+   An allow-list that never denies anything looks configured and guards nothing.
+3. Only if Cadence ever has to be reachable from outside Tailscale, add the access-token
+   middleware sketched in §9. Do not build it now.
+
+> The access list applies **at NPM**. A client on the LAN hitting `192.168.1.21:8090` directly
+> bypasses it entirely.
+
+**Closing that gap** is one variable, no file edit. `docker-compose.yml` publishes
+`${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000`, so adding this to `/opt/cadence/.env` and running
+`make deploy` binds the port to the Tailscale interface only:
+
+```dotenv
+CADENCE_BIND_ADDR=100.x.y.z    # VM-201's Tailscale address, from `tailscale ip -4`
+```
+
+Then verify from a non-Tailscale LAN address that `192.168.1.21:8090` is refused, the same way
+§5's step 2 says to verify the access list actually denies. **The default is `0.0.0.0`**, which
+is what a deploy publishes until somebody sets this — the gap is closed by the operator, not by
+the repo.
+
+Two things not to do. **Do not use `127.0.0.1`**: NPM runs on this host but is containerised and
+forwards to `192.168.1.21:8090`, so loopback-only makes the proxy itself 502. And **do not add a
+`ports` entry to `docker-compose.prod.yml`**: compose *appends* `ports` across `-f` files rather
+than overriding them, so the base mapping stays published alongside the new one and the two
+collide on host 8090 (D-206). The address belongs in the base file's single entry or nowhere.
+
+---
+
+## 6. Backups and restore
+
+`scripts/backup.sh` runs on the host, against the live database, with the app running.
+
+Run it **inside the container**:
+
+```bash
+cd /opt/cadence && docker compose exec -T cadence ./scripts/backup.sh
+# backup: /app/data/backups/cadence-20260907-0317.db (via python)
+```
+
+The snapshot lands in `./data/backups/` on the host either way, because `data/` is a bind
+mount. Inside is the default because `data/` is owned by uid 10001: a host cron running as the
+deploying user cannot write into `data/backups/` and the run fails with `unable to open
+database file` on the *output* file, which reads exactly like the input-side failure in §8 and
+is not the same problem at all. Running it on the host works when the caller is root or owns
+`data/`:
+
+```bash
+sudo -u '#10001' env CADENCE_DB_PATH=/opt/cadence/data/cadence.db /opt/cadence/scripts/backup.sh
+```
+
+It uses `sqlite3 "$DB" ".backup"`, never `cp`. The database runs in WAL mode, so the `.db` file
+alone can be missing the newest committed transactions; `.backup` takes a consistent snapshot
+of a live database. It then runs `PRAGMA integrity_check` **on the copy** — a snapshot that
+cannot be opened is worse than none, and this catches it while the original is still there. It
+prunes to the newest 30 only after a successful, verified backup, so a failed run never eats
+the good history.
+
+The script sets `umask 077`, so each snapshot is written `0600`, and then `chmod 700` on
+`data/backups/` itself. Both are needed: the umask only governs what this script creates, and
+on VM-201 it does not create that directory — `scripts/deploy.sh` runs `mkdir -p data/backups`
+on every deploy, so it already exists at `0755` and the files alone would have tightened. A
+snapshot is the entire database — both profiles' training history, bodyweights and body-fat
+readings — and VM-201 is shared with VitalForge, while the `.env` beside it is `600` (D-201).
+Snapshots taken before this was added keep their old modes: run
+`chmod 600 /opt/cadence/data/backups/*.db` once, if any exist.
+
+Cron, installed by hand on VM-201 (`crontab -e`):
+
+```cron
+17 3 * * * cd /opt/cadence && docker compose exec -T cadence ./scripts/backup.sh >> /var/log/cadence-backup.log 2>&1
+```
+
+`-T` matters: cron has no TTY, and without it `docker compose exec` fails every night with
+`the input device is not a TTY` and the log fills with it instead of with backups.
+
+03:17 rather than 03:00, to miss whatever else on this host runs on the hour.
+
+### Restore
+
+```bash
+cd /opt/cadence
+docker compose down
+
+# All three, not just the .db. A stale -wal beside a restored database is replayed over it by
+# SQLite on the next open, which silently undoes the restore. This is the step everyone forgets.
+mkdir -p data/broken
+mv data/cadence.db data/cadence.db-wal data/cadence.db-shm data/broken/ 2>/dev/null || true
+
+cp data/backups/cadence-20260907-0317.db data/cadence.db
+sudo chown 10001:10001 data/cadence.db
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+make smoke BASE=https://cadence.grepon.cc
+```
+
+---
+
+## 7. Smoke test
+
+```bash
+make smoke                                     # against http://localhost:8090
+make smoke BASE=https://cadence.grepon.cc      # against the VM
+```
+
+Eight steps, exiting non-zero at the first failure with the step number and the response body:
+
+| Step | Check |
+|---|---|
+| 1 | `/api/health` is 200 **and** `ok: true` **and** `data.db == "ok"`, and the server booted in `mock` mode |
+| 2 | `/today?profile=me` renders at least one checklist row |
+| 3 | `/api/today?profile=me` yields a `session_id` and a first row |
+| 4 | ticking that row returns `done: true` |
+| 5 | ticking it again still returns `done: true` — the offline replay path |
+| 6 | `/api/sessions/{id}/done` is 200 |
+| 7 | `/done/{id}` reports `synced ✓`, **and** the mock recorded exactly one activity for that session |
+| 8 | `/api/metrics?profile=me` returns an intact envelope with `ok: true` |
+
+Step 1 refuses to continue unless the server reports `CADENCE_VITALFORGE_MODE=mock`, so the
+smoke test never writes a real activity into Garmin. `SMOKE_ALLOW_LIVE=1` overrides that, and
+means what it says. Note that the run **finishes a real session**, consuming one planned day.
+
+Step 7 checks both halves of one question. The Done screen's line renders a `sync_job` row, so
+it reads the same whether the client handed VitalForge one activity, none, or two; the count
+comes from `GET /api/_mock/activities`, which exists **only** when the mode is `mock` and
+`CADENCE_ENV` is not `prod`. On the VM that route is absent and answers 404, so a smoke run
+against production needs `SMOKE_ALLOW_LIVE=1` and step 7 skips the recorder count, keeping only
+the `#sync-status` assertion.
+
+What that assertion accepts depends on the mode, because the two are asking different
+questions. Under `mock` nothing can fail at the network, so the job must reach `sent` and read
+`synced ✓`. Against a live VitalForge the smoke test's job is to prove **Cadence** works, not
+that VitalForge is reachable, so it accepts any state that means the session reached the queue:
+
+| `data-sync` | Line | Live | Why |
+|---|---|---|---|
+| `sent` | `synced ✓` | pass | VitalForge accepted the activity. |
+| `pending` | `will sync` | pass | **The state on VM-201 today.** A 404 from the not-yet-deployed activity endpoint is saved without spending an attempt (D-137), and reads as "will sync" — not as a failure. |
+| `failed` | `sync failed (retrying)` | pass | Transport trouble; the queue will retry on its own. Matched on the full sentence, since `sync failed` alone is the *terminal* line. |
+| `failed` | `sync failed` | **fail** | Terminal: a 409 or 422 that has given up. |
+| `skipped` | `stored locally — VitalForge not configured` | **fail** | No token reached the container — a misconfigured deploy that otherwise looks healthy. Check `VITALFORGE_TOKEN` in the VM's `.env`. |
+
+So a smoke run against VM-201 passes today, before the VitalForge `cadence/activity-endpoint`
+branch is deployed (D-005), and reports `will sync` while it does.
+
+---
+
+## 8. Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `unable to open database file` at startup | `./data` is not owned by uid 10001. `sudo chown -R 10001:10001 /opt/cadence/data`. On the workstation under rootless podman: `podman unshare chown -R 10001:10001 data`. |
+| The same message on the workstation *after* the chown | SELinux. The compose file mounts `./data:/app/data:Z` for this; if a container is started by hand, pass `:Z` too. Not a VM-201 problem. |
+| `unable to open database file` from `backup.sh`, app running fine | The *output* path, not the input: the caller cannot write `data/backups/`, which uid 10001 owns. Run the backup inside the container (§6). |
+| `make dev-docker` shows no health status | podman-compose builds an OCI image and OCI has no healthcheck field. The target builds with `--format docker` first for this reason; a hand-run `podman build` needs the same flag. |
+| `sync failed`, `last_error` names the `cadence/activity-endpoint` branch | PRP-05 is not deployed on VitalForge yet. Expected until that branch is merged and VitalForge redeployed. |
+| Done shows `stored locally — VitalForge not configured` | `VITALFORGE_TOKEN` is blank in the VM's `.env`, most likely rsynced over. Restore `.env` and check `--exclude '.env'` is still in `scripts/deploy.sh`. |
+| Container restart loop | The process is **exiting**, and `restart: unless-stopped` is putting it back. Read `docker compose logs --tail 50 cadence` first, not the healthcheck. The usual cause is a `.env` that raises at startup — `CADENCE_ENV=prod` with any `*_MODE=mock` is refused by design (D-139) and loops forever, since the settings never get a chance to be wrong differently. |
+| Container reports `unhealthy` but keeps running | The opposite case, and the one `restart:` does **not** cover: Docker's restart policy acts on exit, never on a failing healthcheck, so an unhealthy container stays up and NPM keeps sending it traffic. `docker inspect --format '{{json .State.Health}}' cadence \| jq .` shows the last outputs; a 200 with `ok: false` means the database check failed, so check `./data` ownership. |
+| 502 from NPM | Container down, or NPM is pointed at container port 8000 instead of host port 8090. |
+| — | **Keep `docker inspect` scoped, as the rows above do.** A bare `docker inspect cadence` prints `Config.Env`, which is every variable the container was started with — including `VITALFORGE_TOKEN` and `OMNIROUTE_KEY` in full. That output routinely gets pasted into a chat or an issue. Always pass `--format`, e.g. `--format '{{json .State.Health}}'`. |
+| 413 on Import | `client_max_body_size 5m` missing from the proxy host's Advanced tab (§4). |
+| Disk full on VM-201 | Unrotated container logs. The prod overlay exists to prevent this — confirm the deploy used `-f docker-compose.prod.yml`. |
+| `/today` is stale after a deploy | NPM Cache Assets is on, or the phone's service worker is holding the old shell. Turn caching off and hard-reload once. |
+
+---
+
+## 9. If auth is ever needed (not built)
+
+D-009 says Cadence has no login. If it ever must be reachable from outside Tailscale, the
+smallest thing that works is a single middleware reading `CADENCE_ACCESS_TOKEN` from `.env` and
+comparing it with `hmac.compare_digest` against either an `Authorization: Bearer` header or a
+long-lived cookie set by a one-field `/unlock` page, skipping `/api/health` and `/static/*`. A
+blank token means disabled, so the default stays no-auth. Roughly 40 lines. It is documented
+here and deliberately not implemented.
+
+---
+
+## 10. Rollback
+
+```bash
+git checkout prp-08          # tags are prp-NN
+make deploy
+```
+
+The database is forward-compatible within a schema version, and Cadence's `schema_version`
+check fails loudly at startup rather than corrupting data if it is not. If the rollback crosses
+a schema change, restore the backup taken before the upgrade (§6) as well.
+
+---
+
+## 11. Installing on a phone (D-117)
+
+Cadence is a PWA served by this container. There is no native Android app.
+
+1. Open `https://cadence.grepon.cc/today` in Chrome on the phone, on Tailscale.
+2. Menu (⋮) → **Add to Home screen** → Install.
+3. It opens standalone, with Today cached offline and the tick queue in IndexedDB.
+
+On iOS: Share → **Add to Home Screen**. A Trusted Web Activity wrapper (PWABuilder/Bubblewrap
+→ a sideloadable APK, needing an `assetlinks.json` on the domain) is an optional follow-up, not
+part of this build.
+
+---
+
+## 12. First-deploy checklist
+
+Tick and date these on the first real deploy.
+
+- [ ] `make deploy` from a clean workstation checkout succeeds end to end.  _date:_
+- [ ] `https://cadence.grepon.cc/today` loads over Tailscale, and does **not** load from a
+      non-Tailscale address once the access list is on.  _date:_
+- [ ] `docker compose ps` shows `healthy`, not just `running`.  _date:_
+- [ ] `./scripts/backup.sh` produces a file and the cron line is installed.  _date:_
+- [ ] `make smoke BASE=https://cadence.grepon.cc` exits 0.  _date:_

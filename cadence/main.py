@@ -15,14 +15,14 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.gzip import GZipMiddleware
 
-from cadence.api import health, profiles, sessions
+from cadence.api import health, mock_inspect, profiles, sessions
 from cadence.api import history as api_history
 from cadence.api import metrics as api_metrics
 from cadence.api import settings as api_settings
 from cadence.api import sync as api_sync
 from cadence.api import today as api_today
 from cadence.api.envelope import err
-from cadence.config import Settings, get_settings
+from cadence.config import MOCK_MODE, Settings, get_settings
 from cadence.db import init_db
 from cadence.vitalforge.periodic import periodic_sync
 from cadence.web.gate import SetupRequired, require_setup, setup_redirect
@@ -115,6 +115,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.dependency_overrides[get_settings] = lambda: active
     for router in ROUTERS:
         app.include_router(router)
+    # Mock-mode only, and never under prod. The fake's recorder is the one place that can say
+    # whether a session reported as synced actually produced one activity and not zero or two,
+    # which is what PRP-09's smoke test asserts (D-169). Settings validation already refuses
+    # mock under prod; the env check here means the route cannot appear even if that changes.
+    if active.vitalforge_mode == MOCK_MODE and active.env != "prod":
+        app.include_router(mock_inspect.router)
     for router in GATED_ROUTERS:
         app.include_router(router, dependencies=[Depends(require_setup)])
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

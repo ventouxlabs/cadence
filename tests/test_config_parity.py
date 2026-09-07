@@ -76,9 +76,18 @@ def test_env_example_contains_no_credential_shaped_value() -> None:
 
 
 def test_dotenv_is_ignored_and_absent() -> None:
-    ignored = GITIGNORE.read_text().splitlines()
-    assert ".env" in {line.strip() for line in ignored}
-    assert not (REPO_ROOT / ".env").exists() or True  # a local .env is fine; committing it is not
+    """Asked of git rather than of the file's text.
+
+    This matched the literal line `.env` until D-205 broadened the rule to `.env*` with a
+    `!.env.example` negation — at which point the old assertion failed while the property it
+    existed to protect was strictly stronger. `git check-ignore` answers the actual question,
+    and keeps answering it through any future rewrite of the patterns.
+    """
+    import subprocess
+
+    result = subprocess.run(["git", "check-ignore", "-q", ".env"], cwd=str(REPO_ROOT), check=False, capture_output=True)
+    assert result.returncode == 0, ".env is not git-ignored"
+    assert "!.env.example" in GITIGNORE.read_text(), "the negation that keeps .env.example tracked is gone"
 
 
 @pytest.mark.parametrize("field_name", ["vitalforge_token", "omniroute_key"])

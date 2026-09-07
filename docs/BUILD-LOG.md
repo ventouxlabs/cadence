@@ -57,3 +57,10 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Reviewer: 2 Highs (fast clock → permanent 422; blank token/slug → silent permanent skip) + 4 Mediums; Codex (gpt-5.6-terra): 4 more Highs (token by value, mock in prod, retry re-resolving slug, youth push surviving opt-out) + 3 Mediums; all fixed; re-verify found one interaction High (SENT-with-schedule youth job escaping opt-out) fixed and confirmed by independent probe → APPROVE.
 - Final: 1739 passed, 84 e2e, 94% coverage; D-120..D-143.
 - Squash-merged to main, tagged prp-06, pushed.
+
+## prp-09 — deploy — 2026-09-07 (worktree, parallel with 07/08)
+- Implementer built Dockerfile/compose/scripts/runbook, verified image build + 8-step smoke + backup/restore under podman (1561 tests); merged main (PRP-06) after a session-limit interruption, resolved by a fresh agent.
+- Tester added 18 tests (executable healthcheck probe, restore-from-runbook, mock-mode inspection); fixed the prod-breaking unconditional recorder check in smoke.sh.
+- Reviewer + Codex: 2 Highs (deploy.sh command injection, incomplete .env* gitignore) + 6 Mediums (backup dir perms, port binding, restart-vs-healthcheck doc) + 4 Lows (docker inspect leak, quoting, uv pin, threshold typo) — all fixed and re-verified APPROVE.
+- Final: 1824 passed, 94% coverage, lint clean; image builds and smokes green under podman.
+- Squash-merged to main, tagged prp-09, pushed.
