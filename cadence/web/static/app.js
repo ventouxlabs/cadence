@@ -394,6 +394,21 @@
     detail.isError = false;
   });
 
+  /* PRP-08's two result panels opt in the same way, and for 503 as well as 422: a household with
+     no OmniRoute key gets "generation is not set up here" as the panel's content, and dropping it
+     would leave the Generate button looking broken instead of answered. Kept as its own listener
+     so the settings-form rule above is untouched. */
+  var AI_PANELS = ["import-result", "generate-preview"];
+  document.body.addEventListener("htmx:beforeSwap", function (event) {
+    var detail = event.detail || {};
+    var status = detail.xhr ? detail.xhr.status : 0;
+    if (status !== 422 && status !== 503) return;
+    var target = detail.target || event.target;
+    if (!target || AI_PANELS.indexOf(target.id) === -1) return;
+    detail.shouldSwap = true;
+    detail.isError = false;
+  });
+
   /* An HTMX request that actually landed retires the entry the same change queued. */
   document.body.addEventListener("htmx:afterRequest", function (event) {
     var element = event.target.closest ? event.target.closest("[data-op-key]") : null;

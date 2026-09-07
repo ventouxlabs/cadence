@@ -1,0 +1,63 @@
+{# Swapped into #generate-preview. A read-only checklist that looks like Today, plus Accept and
+   Discard. The document travels in a hidden field and comes back on Accept, which re-validates
+   it from scratch: there is no server-side copy of a preview to trust (PRP-08 risk 6). #}
+<div id="generate-preview">
+  {% if preview %}
+  <div class="preview" data-preview>
+    <p class="preview-head">{{ preview.workout.name }} · {{ preview.rows|length }} exercise{{ '' if preview.rows|length == 1 else 's' }}</p>
+    <ul class="preview-rows">
+      {% for row in preview.rows %}
+      <li class="preview-row" data-preview-row>
+        <span class="preview-box" aria-hidden="true">☐</span>
+        <span class="preview-name">{{ row.name }}</span>
+        <span class="preview-line">
+          {%- if row.reps is not none %}{{ row.sets }} × {{ row.reps }}
+          {%- elif row.seconds is not none %}{{ row.sets }} × {{ row.seconds }} s
+          {%- elif row.meters is not none %}{{ row.sets }} × {{ row.meters }} m
+          {%- elif row.steps is not none %}{{ row.sets }} × {{ row.steps }} steps
+          {%- endif %}
+          {%- if row.load_kg %} · {{ format_load(row.load_kg, unit|default("kg")) }}{% endif %}
+        </span>
+        {% if row.cue %}<span class="preview-cue">{{ row.cue }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <form class="ai-form ai-accept" method="post" action="/settings/generate/accept"
+          hx-post="/settings/generate/accept" hx-target="#generate-preview" hx-swap="outerHTML">
+      <input type="hidden" name="workout" value="{{ preview.document }}">
+      <input type="hidden" name="profile" value="{{ preview.profile }}">
+      <div class="field-row">
+        <label class="person-label" for="generate_day_type">Use for</label>
+        <select class="input" id="generate_day_type" name="day_type">
+          <option value="">just save it</option>
+          {% for value, label in preview.day_types %}
+          <option value="{{ value }}">{{ label }} days</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="save save-quiet" type="submit" data-accept>Accept</button>
+      <button class="save save-quiet" type="submit" data-discard
+              formaction="/settings/generate/discard"
+              hx-post="/settings/generate/discard" hx-target="#generate-preview" hx-swap="outerHTML">Discard</button>
+    </form>
+  </div>
+  {% elif result and result.ok %}
+  <p class="ai-ok" role="status" data-generate-ok>
+    ✓ Saved “{{ result.name }}” — {{ result.rows }} exercise{{ '' if result.rows == 1 else 's' }}.
+    {% if result.swapped %}Now used for {{ result.swapped }} planned session{{ '' if result.swapped == 1 else 's' }}.{% endif %}
+  </p>
+  {% for warning in result.warnings %}
+  <p class="ai-warn">! {{ warning }}</p>
+  {% endfor %}
+  {% if result.swap_error %}<p class="ai-warn">! {{ result.swap_error }}</p>{% endif %}
+  {% elif result %}
+  <p class="ai-bad" role="alert" data-generate-error-count>
+    ✕ {{ result.errors|length }} problem{{ '' if result.errors|length == 1 else 's' }}
+  </p>
+  <ul class="ai-errors">
+    {% for error in result.errors %}
+    <li data-generate-error>{% if error.row %}row {{ error.row }} — {% endif %}{{ error.message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>

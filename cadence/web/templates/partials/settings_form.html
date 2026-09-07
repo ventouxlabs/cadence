@@ -188,10 +188,9 @@
     <p class="card-note">Blank stays blank — Cadence never guesses a slug from a name.</p>
   </section>
 
-  {% if mode == 'settings' %}
-  {% include "partials/import_section.html" %}
-  {% include "partials/generate_section.html" %}
-  {% endif %}
+  {# PRP-08's Import and Generate cards used to be included here. They moved out to
+     settings.html: each carries its own <form>, a nested form is not valid HTML, and this form
+     swaps its own outerHTML on save - which would take a preview with it (D-174). #}
 
   <div class="save-bar">
     <button class="save" type="submit">{% if mode == 'setup' %}Start training{% else %}Save{% endif %}</button>

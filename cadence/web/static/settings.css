@@ -272,3 +272,127 @@ body:has(.settings) {
   background: #fdf3f3;
   line-height: 1.35;
 }
+
+/* --------------------------------------------------------------- PRP-08: import and generate
+   Two cards that live outside `#settings-form`, each with a form of its own. Nothing here is
+   on the Today hot path, so the rules are plain and the budget (D-025) is unaffected. */
+.ai-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  margin: 12px 0 0;
+}
+
+.field-label {
+  font-weight: 600;
+}
+
+.input-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  line-height: 1.35;
+  min-height: 160px;
+  resize: vertical;
+}
+
+.busy {
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+/* HTMX shows this only while a request is in flight. Without the rule it is always visible. */
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline;
+}
+
+.ai-ok,
+.ai-warn,
+.ai-bad {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  line-height: 1.35;
+}
+
+.ai-ok {
+  color: var(--go);
+  background: #eef7f1;
+  border: 1px solid var(--go);
+}
+
+.ai-warn {
+  color: #7a4a06;
+  background: #fdf6ec;
+  border: 1px solid #c07a10;
+}
+
+.ai-bad {
+  color: #9b1c1c;
+  background: #fdf3f3;
+  border: 1px solid #9b1c1c;
+  font-weight: 600;
+}
+
+.ai-errors {
+  margin: 8px 0 0;
+  padding: 0 0 0 20px;
+  line-height: 1.4;
+}
+
+.ai-errors li {
+  margin: 0 0 6px;
+}
+
+/* The preview reads as the real checklist rather than as a form, because it is a decision about
+   a workout and not a workout to do: no tap targets, no checkboxes that do anything. */
+.preview {
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.preview-head {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.preview-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preview-row {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 2px 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.preview-box {
+  grid-row: 1 / span 3;
+  color: var(--ink-soft);
+}
+
+.preview-name {
+  font-weight: 600;
+}
+
+.preview-line,
+.preview-cue {
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.ai-accept {
+  margin-top: 12px;
+}

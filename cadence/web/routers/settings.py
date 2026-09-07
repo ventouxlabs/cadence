@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlmodel import Session
 
+from cadence.bibliotheque import adoption
 from cadence.db import get_session
 from cadence.profils import services
 from cadence.profils.services import RebuildUnavailable
@@ -28,6 +29,7 @@ from cadence.schema.enums import AgeBand
 from cadence.seance.catalog import library_bundle
 from cadence.web.gate import require_setup
 from cadence.web.rendering import templates
+from cadence.web.routers import settings_ai
 
 router = APIRouter(tags=["settings"])
 
@@ -176,6 +178,37 @@ def _state_form(settings: ProgramSettings, me: Profile, son: Profile) -> dict[st
     }
 
 
+def _generation_configured(request: Request) -> bool:
+    """Whether the Generate card is offered at all.
+
+    Read off ``app.state``, which ``create_app`` sets from the settings the app was built with,
+    rather than off the process-wide cache: the two differ in every test and would differ in any
+    install that ever builds a second app.
+    """
+    config = getattr(request.app.state, "settings", None)
+    return bool(config is not None and config.omniroute_configured)
+
+
+def _ai_context(request: Request, me: Profile, son: Profile, gaps: tuple[tuple[str, str], ...]) -> dict[str, Any]:
+    """What PRP-08's Import and Generate cards need. Static apart from the gap list.
+
+    Kept in one function so the Settings screen has one place that knows the cards exist, and so
+    the goal list a youth profile could be offered is filtered where it is chosen rather than
+    only where it is checked (D-026, principles section 3.5).
+    """
+    kinds = {profile.id: profile.kind for profile in (me, son)}
+    return {
+        "profile_choices": tuple((profile.id, profile.display_name) for profile in (me, son)),
+        "profile_kinds": kinds,
+        # Keyed to the adult profile when there is one: the select serves both people, and the
+        # son is protected by ``goal_is_allowed`` on the write path rather than by a shorter list.
+        "goal_choices": settings_ai.goal_choices("adult" if "adult" in kinds.values() else "youth"),
+        "gap_choices": gaps,
+        "day_type_choices": adoption.day_type_choices(),
+        "generate_enabled": _generation_configured(request),
+    }
+
+
 def _context(
     request: Request,
     mode: str,
@@ -186,8 +219,10 @@ def _context(
     errors: dict[str, str] | None = None,
     saved: bool = False,
     form_error: str | None = None,
+    gaps: tuple[tuple[str, str], ...] = (),
 ) -> dict[str, Any]:
     return {
+        **_ai_context(request, me, son, gaps),
         "request": request,
         "mode": mode,
         "action": "/setup" if mode == "setup" else "/settings",
@@ -236,7 +271,15 @@ def settings_page(request: Request, db: Annotated[Session, Depends(get_session)]
         me, son = _profile(db, PROFILE_ME), _profile(db, PROFILE_SON)
     except ProfilesMissing:
         return _needs_seeding(request)
-    context = _context(request, "settings", settings, me, son, _state_form(settings, me, son))
+    context = _context(
+        request,
+        "settings",
+        settings,
+        me,
+        son,
+        _state_form(settings, me, son),
+        gaps=settings_ai.gap_choices_for_household(db),
+    )
     return templates.TemplateResponse(request, "settings.html", context)
 
 

@@ -7,6 +7,7 @@ connections against the same file.
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -23,8 +24,8 @@ from cadence.main import create_app
 from cadence.schema import AgeBand, Exercise, YouthRules, YouthRuleSet
 
 ENV_VARS = (
-    "CADENCE_DB_PATH",
     "CADENCE_ENV",
+    "CADENCE_DB_PATH",
     "CADENCE_PERIODIC_SYNC",
     "CADENCE_HOST",
     "CADENCE_PORT",
@@ -34,6 +35,7 @@ ENV_VARS = (
     "VITALFORGE_TOKEN",
     "VITALFORGE_PERSON_ME",
     "VITALFORGE_PERSON_SON",
+    "CADENCE_OMNIROUTE_MODE",
     "OMNIROUTE_URL",
     "OMNIROUTE_KEY",
     "OMNIROUTE_MODEL_GENERATE",
@@ -207,6 +209,52 @@ async def aged_son_client(aged_son: FastAPI) -> AsyncIterator[httpx.AsyncClient]
     transport = httpx.ASGITransport(app=aged_son)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+class OmniRouteGateway:
+    """A stand-in for the OmniRoute gateway (PRP-08).
+
+    Replies are queued and consumed in order; the last one repeats, so "always fails" is one
+    ``reply`` call. Every request is captured whole, which is what the prompt-contents assertions
+    read - a test that only counted calls would not notice a bodyweight travelling.
+    """
+
+    def __init__(self) -> None:
+        self.requests: list[httpx.Request] = []
+        self.bodies: list[dict] = []
+        self._replies: list[tuple[int, object]] = []
+
+    def reply(self, text: str, *, status: int = 200) -> OmniRouteGateway:
+        """Queue one completion, as an OpenAI-compatible body."""
+        self._replies.append((status, {"choices": [{"message": {"role": "assistant", "content": text}}]}))
+        return self
+
+    def reply_raw(self, payload: object, *, status: int = 200) -> OmniRouteGateway:
+        self._replies.append((status, payload))
+        return self
+
+    def _handle(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        self.bodies.append(json.loads(request.content.decode()))
+        if not self._replies:
+            return httpx.Response(200, json={"choices": [{"message": {"content": ""}}]})
+        status, payload = self._replies[min(len(self.requests) - 1, len(self._replies) - 1)]
+        return httpx.Response(status, json=payload)
+
+    @property
+    def transport(self) -> httpx.MockTransport:
+        return httpx.MockTransport(self._handle)
+
+    @property
+    def prompts(self) -> list[str]:
+        """The user message of every request, which is the whole outgoing prompt."""
+        return [body["messages"][0]["content"] for body in self.bodies]
+
+
+@pytest.fixture
+def omniroute_gateway() -> OmniRouteGateway:
+    """The mocked OmniRoute gateway. No test in this repo needs a key or a network."""
+    return OmniRouteGateway()
 
 
 # --------------------------------------------------------------- PRP-06: no real network, ever

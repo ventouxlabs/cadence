@@ -1,0 +1,22 @@
+{# Swapped into #import-result. Carries the id itself because the swap is outerHTML. #}
+<div id="import-result">
+  {% if result and result.ok %}
+  <p class="ai-ok" role="status" data-import-ok>
+    ✓ Imported “{{ result.name }}” — {{ result.rows }} exercise{{ '' if result.rows == 1 else 's' }}.
+    {% if result.swapped %}Now used for {{ result.swapped }} planned session{{ '' if result.swapped == 1 else 's' }}.{% endif %}
+  </p>
+  {% for warning in result.warnings %}
+  <p class="ai-warn" data-import-warning>! {{ warning }}</p>
+  {% endfor %}
+  {% if result.swap_error %}<p class="ai-warn">! {{ result.swap_error }}</p>{% endif %}
+  {% elif result %}
+  <p class="ai-bad" role="alert" data-import-error-count>
+    ✕ {{ result.errors|length }} problem{{ '' if result.errors|length == 1 else 's' }}
+  </p>
+  <ul class="ai-errors">
+    {% for error in result.errors %}
+    <li data-import-error>{% if error.row %}row {{ error.row }} — {% endif %}{{ error.message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>

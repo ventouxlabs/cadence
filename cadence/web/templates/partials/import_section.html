@@ -1,7 +1,45 @@
-{# Container only. PRP-08 fills this with the textarea, the file input and the target profile;
-   the id and the partial name are the contract, so nothing here moves when it does. #}
-<section class="card card-disabled" aria-labelledby="import-head">
+{# The Import card. Its own form, outside `#settings-form`: a nested form is not valid HTML, this
+   one carries a file input the Save button has no business submitting, and the settings form
+   swaps its own outerHTML on save - which would take the result panel with it (D-174).
+
+   Every value shown back comes through Jinja and is escaped by the environment. Nothing here is
+   marked `|safe`. #}
+<section class="card" aria-labelledby="import-head">
   <h2 class="card-head" id="import-head">Import workout</h2>
-  <p class="card-note">Paste YAML or JSON, or upload a file. Arriving in a later build.</p>
+  <form id="import-form" class="ai-form" method="post" action="/settings/import"
+        hx-post="/settings/import" hx-encoding="multipart/form-data"
+        hx-target="#import-result" hx-swap="outerHTML" hx-indicator="#import-busy">
+    <label class="field-label" for="import_text">Paste YAML or JSON</label>
+    <textarea class="input input-code" id="import_text" name="text" rows="8" spellcheck="false"
+              placeholder="id: my-upper&#10;name: My upper&#10;rows:&#10;  - exercise_id: push-up"></textarea>
+
+    <div class="field-row">
+      <label class="person-label" for="import_file">or choose a file</label>
+      <input class="input" type="file" id="import_file" name="file" accept=".yaml,.yml,.json,.txt">
+    </div>
+    <p class="card-note">Up to 256 KB. The file is read and thrown away — nothing is written to disk.</p>
+
+    <div class="field-row">
+      <label class="person-label" for="import_profile">For</label>
+      <select class="input" id="import_profile" name="profile" required>
+        {% for value, label in profile_choices %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="field-row">
+      <label class="person-label" for="import_day_type">Use for</label>
+      <select class="input" id="import_day_type" name="day_type">
+        <option value="">just save it</option>
+        {% for value, label in day_type_choices %}
+        <option value="{{ value }}">{{ label }} days</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button class="save save-quiet" type="submit">Check and import</button>
+    <span class="busy htmx-indicator" id="import-busy" role="status">Checking…</span>
+  </form>
   <div id="import-result"></div>
 </section>

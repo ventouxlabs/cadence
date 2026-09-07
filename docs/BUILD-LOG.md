@@ -64,3 +64,9 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Reviewer + Codex: 2 Highs (deploy.sh command injection, incomplete .env* gitignore) + 6 Mediums (backup dir perms, port binding, restart-vs-healthcheck doc) + 4 Lows (docker inspect leak, quoting, uv pin, threshold typo) — all fixed and re-verified APPROVE.
 - Final: 1824 passed, 94% coverage, lint clean; image builds and smokes green under podman.
 - Squash-merged to main, tagged prp-09, pushed.
+## prp-08 — ai-ingestion — 2026-09-07 (worktree, parallel with 07/09)
+- Implementer built import/generate pipeline, OmniRoute client, prompt template, Settings UI (89 tests, 6 e2e); merged main (PRP-06) after a session-limit interruption, resolved by a fresh agent.
+- Codex (gpt-5.6-terra): 5 Highs (inline-exercise metadata trust, multipart spooling, yaml anchor gap, retry-prompt bodyweight leak, adoption race) + several Mediums fixed.
+- Devil's-advocate: 2 Highs (mock/schema example hardcoded "adult", breaking youth generation) + Mediums fixed; a full independent re-review found 1 Medium (unbounded body read on two settings routes) + 5 Lows, all fixed.
+- Final: 1945 passed, 95 e2e, 94% coverage, lint clean.
+- Squash-merged to main, tagged prp-08, pushed.

@@ -15,8 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.gzip import GZipMiddleware
 
+from cadence.api import generate as api_generate
 from cadence.api import health, mock_inspect, profiles, sessions
 from cadence.api import history as api_history
+from cadence.api import import_ as api_import
 from cadence.api import metrics as api_metrics
 from cadence.api import settings as api_settings
 from cadence.api import sync as api_sync
@@ -26,10 +28,12 @@ from cadence.config import MOCK_MODE, Settings, get_settings
 from cadence.db import init_db
 from cadence.vitalforge.periodic import periodic_sync
 from cadence.web.gate import SetupRequired, require_setup, setup_redirect
+from cadence.web.guards import RequestRefused, refusal_response
 from cadence.web.rendering import STATIC_DIR
 from cadence.web.routers import history as web_history
 from cadence.web.routers import pwa
 from cadence.web.routers import settings as web_settings
+from cadence.web.routers import settings_ai as web_settings_ai
 from cadence.web.routers import today as web_today
 
 # Later PRPs append one line each.
@@ -40,9 +44,12 @@ ROUTERS: list[APIRouter] = [
     profiles.router,
     sessions.router,
     api_history.router,
+    api_import.router,
+    api_generate.router,
     api_metrics.router,
     api_sync.router,
     web_settings.router,
+    web_settings_ai.router,
     pwa.router,
 ]
 
@@ -109,6 +116,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(status_code=422, content=err(f"this request body is not valid: {fields}"))
 
     app.add_exception_handler(SetupRequired, setup_redirect)
+    # A request refused before its body was read: too large to accept, or from another
+    # site. Answered in the envelope for /api and as the panel's partial for Settings.
+    app.add_exception_handler(RequestRefused, refusal_response)
     app.add_middleware(GZipMiddleware, minimum_size=GZIP_MINIMUM_SIZE)
     app.state.settings = active
     if settings is not None:

@@ -1,6 +1,42 @@
-{# Container only. PRP-08 fills this with the goal and gap selects and the Generate button. #}
-<section class="card card-disabled" aria-labelledby="generate-head">
+{# The Generate card. Its own form for the same reasons the Import card has one (D-174). #}
+<section class="card" aria-labelledby="generate-head">
   <h2 class="card-head" id="generate-head">Generate workout</h2>
-  <p class="card-note">Pick a goal, optionally name a gap, and preview before accepting. Arriving in a later build.</p>
+  {% if not generate_enabled %}
+  <p class="card-note" data-generate-disabled>
+    Workout generation is not set up on this install. Import a workout instead.
+  </p>
+  {% else %}
+  <form id="generate-form" class="ai-form" method="post" action="/settings/generate"
+        hx-post="/settings/generate" hx-target="#generate-preview" hx-swap="outerHTML"
+        hx-indicator="#generate-busy">
+    <div class="field-row">
+      <label class="person-label" for="generate_profile">For</label>
+      <select class="input" id="generate_profile" name="profile" required>
+        {% for value, label in profile_choices %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field-row">
+      <label class="person-label" for="generate_goal">Goal</label>
+      <select class="input" id="generate_goal" name="goal" required>
+        {% for value, label in goal_choices %}
+        <option value="{{ value }}"{% if value == 'posture' %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field-row">
+      <label class="person-label" for="generate_gap">Chase</label>
+      <select class="input" id="generate_gap" name="gap">
+        <option value="">nothing in particular</option>
+        {% for value, label in gap_choices %}
+        <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="save save-quiet" type="submit" data-generate>Generate</button>
+    <span class="busy htmx-indicator" id="generate-busy" role="status">Asking the model — this takes a few seconds…</span>
+  </form>
+  {% endif %}
   <div id="generate-preview"></div>
 </section>

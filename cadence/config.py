@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     vitalforge_person_me: str = Field(default="", validation_alias="VITALFORGE_PERSON_ME")
     vitalforge_person_son: str = Field(default="", validation_alias="VITALFORGE_PERSON_SON")
 
+    omniroute_mode: Literal["live", "mock"] = Field(default="live", validation_alias="CADENCE_OMNIROUTE_MODE")
     omniroute_url: AnyHttpUrl = Field(default=AnyHttpUrl("https://llm.grepon.cc/v1"), validation_alias="OMNIROUTE_URL")
     omniroute_key: SecretStr = Field(default=SecretStr(""), validation_alias="OMNIROUTE_KEY")
     omniroute_model_generate: str = Field(default="code-plan", validation_alias="OMNIROUTE_MODEL_GENERATE")
@@ -95,6 +96,26 @@ class Settings(BaseSettings):
     def vitalforge_configured(self) -> bool:
         """Whether a VitalForge token is present. Never exposes the token itself."""
         return bool(self.vitalforge_token.get_secret_value())
+
+    @property
+    def omniroute_mocked(self) -> bool:
+        """Whether generation answers from the canned workout instead of the gateway.
+
+        Never in production. The mock exists so PRP-09's deploy smoke test can drive Generate on a
+        box that holds no key; left on by a stray environment variable it would serve the same
+        three exercises to the household for ever, and silently (D-187).
+        """
+        return self.omniroute_mode == "mock" and self.env != "prod"
+
+    @property
+    def omniroute_configured(self) -> bool:
+        """Whether generation can run at all. Never exposes the key itself.
+
+        Mock mode is configured by definition; a production install is not, unless it has a key.
+        Branching on the key rather than on this property is how a box with neither gets a
+        traceback instead of a 503.
+        """
+        return self.omniroute_mocked or bool(self.omniroute_key.get_secret_value())
 
 
 @lru_cache
