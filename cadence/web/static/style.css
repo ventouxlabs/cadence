@@ -51,9 +51,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--gap);
-  height: 52px;
-  padding: 0 12px;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 8px;
+  overflow-x: clip;
   background: var(--accent);
   color: var(--accent-ink);
   position: sticky;
@@ -69,7 +70,7 @@ body {
   display: flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 10px;
   border-radius: 8px;
   color: var(--accent-ink);
   text-decoration: none;
@@ -369,6 +370,14 @@ a.brand {
 }
 
 .section-on { background: var(--accent-ink); color: var(--accent); font-weight: 600; }
+
+/* Never scroll sideways, whatever the fonts measure: below 400px the bar tightens up so the
+   brand, the section link and the three profile tabs always fit in one row. */
+@media (max-width: 400px) {
+  .topbar { gap: 4px; padding: 0 6px; }
+  .brand { font-size: 15px; letter-spacing: 0; }
+  .section, .tab { padding: 0 7px; font-size: 14px; }
+}
 
 .visually-hidden {
   position: absolute;
