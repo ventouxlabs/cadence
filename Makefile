@@ -2,7 +2,7 @@
 CADENCE_HOST ?= 0.0.0.0
 CADENCE_PORT ?= 8090
 
-.PHONY: dev test lint fmt seed e2e deploy
+.PHONY: dev test lint fmt seed seed-fresh e2e deploy
 
 dev:  ## Run the app with reload on $(CADENCE_HOST):$(CADENCE_PORT)
 	uv run uvicorn cadence.main:app --reload --host $(CADENCE_HOST) --port $(CADENCE_PORT)
@@ -16,8 +16,11 @@ lint:  ## The CI gate
 fmt:  ## Format and autofix in place
 	uv run ruff format . && uv run ruff check --fix .
 
-seed:  ## Load library/ into the database and build a block per profile
+seed:  ## Load library/ into the database and build a block per profile (marks setup done)
 	uv run python -m cadence.bibliotheque.seed
+
+seed-fresh:  ## The same, left un-set-up so the front door opens on /setup (D-091)
+	uv run python -m cadence.bibliotheque.seed --fresh
 
 e2e:  ## Playwright, 390x844 (PRP-02 adds the tests)
 	uv run pytest tests/e2e --browser chromium -o addopts=""

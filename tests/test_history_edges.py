@@ -25,7 +25,7 @@ from cadence.historique.queries import recent_sessions
 from cadence.historique.scorecard import current_streak, weekly_scorecard
 from cadence.historique.sparkline import WIDTH, sparkline
 from cadence.historique.trend import TrendSeries, body_comp_trend
-from cadence.profils.tables import PROFILE_ME, PROFILE_SON, Profile
+from cadence.profils.tables import PROFILE_ME, PROFILE_SON, Profile, Setting
 from cadence.programme.tables import PlannedSession
 from cadence.vitalforge.tables import MetricsCache
 from tests.test_historique import ROW_COUNT, _plan, _profiles, _session
@@ -189,6 +189,7 @@ def test_a_streak_for_a_profile_that_does_not_exist(db_session: DbSession) -> No
 async def test_together_names_a_profile_that_is_missing(db_session: DbSession, client: httpx.AsyncClient) -> None:
     """One seeded profile still renders a page; the other is named rather than 404ing the tab."""
     db_session.add(Profile(id=PROFILE_ME, display_name="Me", kind="adult"))
+    db_session.add(Setting(key="setup_complete", value_json="true", updated_at="2026-09-06T00:00:00+00:00"))
     db_session.commit()
 
     view = build_page(db_session, "together")

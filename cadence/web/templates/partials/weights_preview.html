@@ -1,0 +1,23 @@
+{# The live parse of `weights_available` (PRP-03). Warnings are never fatal: an unreadable token
+   is ignored and named, so the person can see the app did not silently guess a weight. #}
+<div id="weights-preview" class="preview">
+  {% for ladder in preview.ladders %}
+  <p class="preview-line preview-ok">
+    ✓ {{ ladder.load_type|replace("dumbbell", "Dumbbells")|replace("kettlebell", "Kettlebells") }}
+    {% if ladder.rungs > 1 %}
+      {{ ladder.min_kg|round(2) }}–{{ ladder.max_kg|round(2) }} kg ({{ ladder.rungs }} rungs)
+    {% else %}
+      {{ ladder.max_kg|round(2) }} kg
+    {% endif %}
+  </p>
+  {% endfor %}
+  {% if preview.bench %}
+  <p class="preview-line preview-ok">✓ Adjustable bench</p>
+  {% endif %}
+  {% for warning in preview.warnings %}
+  <p class="preview-line preview-warn" role="status">⚠ {{ warning }}</p>
+  {% endfor %}
+  {% if not preview.ladders and not preview.bench and not preview.warnings %}
+  <p class="preview-line preview-muted">Bodyweight only — no weights listed.</p>
+  {% endif %}
+</div>

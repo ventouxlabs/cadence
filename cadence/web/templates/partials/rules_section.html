@@ -1,0 +1,46 @@
+{# Which rule set protects a profile. Its own form, outside `#settings-form`: a nested form is not
+   valid HTML, and this is deliberately not part of the one Save either. Changing which rules
+   apply to a child is not a thing that should happen while saving a session length.
+
+   No HTMX. A plain post and a full re-render, so the confirm cannot be lost to a partial swap and
+   the control works with JavaScript off (D-099). #}
+<section class="card card-rules" aria-labelledby="rules-head">
+  <h2 class="card-head" id="rules-head">Which rules apply to {{ son.display_name }}</h2>
+  {% if is_youth(son) %}
+  <p class="card-note">
+    Youth rules: lighter loads, shorter sessions, no max-effort work, and an always-visible
+    “good enough — done” exit. His age sets which band inside those rules he trains under.
+  </p>
+  {% else %}
+  <p class="card-note">
+    Adult rules: no youth load caps and no youth session limits.
+  </p>
+  {% endif %}
+
+  <form class="kind-form" method="post" action="/settings/profiles/{{ son.id }}/kind">
+    <input type="hidden" name="kind" value="{{ 'adult' if is_youth(son) else 'youth' }}">
+    <label class="check">
+      <input type="checkbox" name="confirm" value="1">
+      <span>
+        {% if is_youth(son) %}
+        I understand this removes the youth limits
+        {% else %}
+        Put this profile back under the youth rules
+        {% endif %}
+      </span>
+    </label>
+    {% with field = "confirm", message = errors.get("confirm") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+    {% with field = "kind", message = errors.get("kind") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+    <button class="save save-quiet" type="submit" data-kind-submit>
+      {% if is_youth(son) %}
+      Mark {{ son.display_name }} as an adult profile
+      {% else %}
+      Mark {{ son.display_name }} as a youth profile
+      {% endif %}
+    </button>
+  </form>
+</section>

@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 
 from cadence.bibliotheque.seed import seed
 from cadence.db import ExerciseRecord, WorkoutRecord, init_db
-from cadence.profils.settings import DEFAULT_SETTINGS
+from cadence.profils.settings import DEFAULT_SETTINGS, SETTING_KEYS
 from cadence.profils.tables import Profile, Setting
 from cadence.programme.bands import age_band, band_for_age, effective_cap, week_of_block
 from cadence.programme.builder import build_program
@@ -53,14 +53,21 @@ def test_band_for_age(age: int | None, expected: AgeBand) -> None:
 def test_age_band_holds_a_youth_profile_inside_the_youth_rules(adult_profile: Profile) -> None:
     """The parent is always adult; a youth profile never ages out of the youth rules by arithmetic.
 
-    A youth profile whose age computes to `adult` falls to the strictest band, not the loosest -
-    the same coercion the validator makes for the same contradiction (D-037b).
+    Two different unknowns, two different answers (D-099). No recorded age is `u10`: nothing is
+    known, so nothing is assumed. An age past the section 3.1 table is `age_14_17`: it is an
+    answer the table does not extend to, and reading a correct entry of 40 as "under ten" is not
+    caution, it is a wrong number. Neither leaves the youth rules, which is the property that
+    matters and is what this test is named for.
     """
     assert age_band(adult_profile) is AgeBand.ADULT
     assert age_band(Profile(id="son", display_name="Son", kind="youth")) is AgeBand.U10
-    assert age_band(Profile(id="son", display_name="Son", kind="youth", age_years=40)) is AgeBand.U10
-    coerced, _ = effective_band("youth", AgeBand.ADULT)
-    assert coerced is age_band(Profile(id="son", display_name="Son", kind="youth", age_years=40))
+    assert age_band(Profile(id="son", display_name="Son", kind="youth", age_years=40)) is AgeBand.AGE_14_17
+
+    # And the validator does not disagree: it coerces only a band of `adult`, which a youth
+    # profile is now never given, so the engine cannot offer a row the gate would reject (D-066).
+    for years in (None, 8, 12, 17, 18, 40):
+        band = age_band(Profile(id="son", display_name="Son", kind="youth", age_years=years))
+        assert effective_band("youth", band) == (band, False)
 
 
 def test_effective_cap_takes_the_lower_of_the_two(library) -> None:
@@ -352,7 +359,9 @@ def test_seed_creates_two_profiles_and_two_programs(settings) -> None:
 
         assert len(session.exec(select(Program)).all()) == 2
         assert len(session.exec(select(PlannedSession)).all()) == 32
-        assert len(session.exec(select(Setting)).all()) == 8
+        # Every key this build knows, not a number to re-edit each time a PRP adds one
+        # (PRP-03 added `display_unit`, D-090).
+        assert len(session.exec(select(Setting)).all()) == len(SETTING_KEYS)
         assert "seeded 52 exercises" in report.summary()
 
 
@@ -567,7 +576,14 @@ def test_reseeding_after_a_settings_change_keeps_completed_sessions(settings) ->
         planned = session.exec(
             select(PlannedSession).where(PlannedSession.profile_id == "me", PlannedSession.status == "planned")
         ).all()
-        assert len(planned) == 12, "the new three-day block replaces only the sessions still pending"
+        # Twelve slots in a four-week block at three days a week, two of them already spent on the
+        # done and the skipped session, so ten are left to do. `make seed` and the Settings screen
+        # share one rebuild now (D-098d), and this is that rule: a finished session occupies its
+        # place in the block rather than having a fresh one appended past the end of it.
+        # Twelve slots in a four-week block at three days a week. The done session spent one of
+        # them; the skipped one did not, because a day that did not happen must not shorten the
+        # plan (D-111). So eleven are left to do.
+        assert len(planned) == 11, "the new three-day block replaces only the sessions still pending"
 
 
 def test_reseeding_drops_planned_sessions_the_new_block_does_not_need(settings) -> None:

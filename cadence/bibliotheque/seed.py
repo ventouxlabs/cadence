@@ -7,6 +7,7 @@ not ``seed`` is ever touched, so an imported or generated workout survives a re-
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -17,14 +18,44 @@ from sqlmodel import Session, select
 from cadence.bibliotheque.loader import LIBRARY_DIR, LibraryError, load_library
 from cadence.config import get_settings
 from cadence.db import ExerciseRecord, WorkoutRecord, init_db
+from cadence.profils.rebuild import rebuild_one
 from cadence.profils.settings import DEFAULT_SETTINGS, ProgramSettings, settings_from_rows
 from cadence.profils.tables import PROFILE_ME, PROFILE_SON, Profile, Setting
+from cadence.profils.validation import check_person_slug
 from cadence.programme.bands import age_band
-from cadence.programme.builder import build_program, program_id
 from cadence.programme.errors import ProgramBuildError
-from cadence.programme.tables import PLANNED, PlannedSession, Program
+from cadence.programme.tables import PlannedSession, Program
 
 SEED_SOURCE = "seed"
+
+
+class SeedError(RuntimeError):
+    """A seed that will not run because the environment it was handed is wrong.
+
+    Distinct from ``LibraryError``: the library is fine, the operator's ``.env`` is not. Both mean
+    nothing was written and neither may exit 0.
+    """
+
+
+# D-091. Demo data is *set up* data: `make seed && make dev` has to open Today, and PRP-03's gate
+# would otherwise send every seeded install to a Setup screen it has already answered for them.
+# `--fresh` (or CADENCE_SEED_SETUP_COMPLETE=0) is the true first run, and it is the one setting a
+# re-seed overwrites: a flag whose whole purpose is "give me the front door back" that declined to
+# clear an existing `true` would do nothing at all on the second run.
+SETUP_COMPLETE_ENV = "CADENCE_SEED_SETUP_COMPLETE"
+FRESH_FLAG = "--fresh"
+
+
+def _setup_complete_from_env(args: list[str]) -> bool:
+    """Whether this seed marks setup done. Read from the process env, never from ``config``.
+
+    Deliberately not a ``cadence.config`` field: settings there are cached process-wide and the
+    test suite scrubs a fixed list of names, so a build flag added to it leaks between tests as
+    ambient environment rather than staying an argument to one command.
+    """
+    if FRESH_FLAG in args:
+        return False
+    return os.environ.get(SETUP_COMPLETE_ENV, "1").strip().lower() not in {"0", "false", "no"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,26 +115,55 @@ def _upsert_workouts(session: Session, templates: dict, stamp: str) -> int:
     return len(templates)
 
 
-def _ensure_settings(session: Session, stamp: str) -> ProgramSettings:
-    """Install the defaults for any setting not already stored; never overwrite a chosen one."""
+def _ensure_settings(session: Session, stamp: str, setup_complete: bool = True) -> ProgramSettings:
+    """Install the defaults for any setting not already stored; never overwrite a chosen one.
+
+    ``setup_complete`` is the one exception, and only downwards: a ``--fresh`` seed rewrites it to
+    false so the next request lands on ``/setup`` (D-091). Marking it *true* still only fills a
+    gap, so an install part-way through setup is not quietly declared finished.
+    """
+    defaults = DEFAULT_SETTINGS.with_changes(setup_complete=setup_complete).as_rows()
     stored = {row.key: row.value_json for row in session.exec(select(Setting)).all()}
-    for key, value in DEFAULT_SETTINGS.as_rows().items():
-        if key not in stored:
+    for key, value in defaults.items():
+        existing = session.get(Setting, key)
+        forced = key == "setup_complete" and not setup_complete
+        if existing is None:
             session.add(Setting(key=key, value_json=value, updated_at=stamp))
             stored[key] = value
+        elif forced:
+            existing.value_json = value
+            existing.updated_at = stamp
+            stored[key] = value
     return settings_from_rows(stored)
+
+
+def _env_slug(name: str, value: str) -> str:
+    """A person slug from the environment, checked the same way a typed one is.
+
+    ``_ensure_profiles`` writes these straight onto the profile rows, which is the one entry point
+    that does not pass through ``validate_profile_patch``, so a bad slug in ``.env`` reached the
+    database however carefully the screen was validated. Operator input is still input: the slug
+    ends up interpolated into ``/p/{slug}/api/...`` by PRP-06 exactly like a typed one (D-114).
+    Blank stays legal and means "not set" (D-017).
+    """
+    problems = check_person_slug(value)
+    if problems:
+        raise SeedError(f"{name} is not a usable VitalForge person slug: {problems[0].message}")
+    return value
 
 
 def _ensure_profiles(session: Session) -> list[Profile]:
     """The two demo profiles. An existing profile keeps whatever the user has set on it."""
     config = get_settings()
+    person_me = _env_slug("VITALFORGE_PERSON_ME", config.vitalforge_person_me)
+    person_son = _env_slug("VITALFORGE_PERSON_SON", config.vitalforge_person_son)
     wanted = (
         Profile(
             id=PROFILE_ME,
             display_name="Me",
             kind="adult",
             age_years=None,
-            vitalforge_person=config.vitalforge_person_me,
+            vitalforge_person=person_me,
             push_to_garmin=True,
         ),
         Profile(
@@ -112,7 +172,7 @@ def _ensure_profiles(session: Session) -> list[Profile]:
             kind="youth",
             # Section 3.8: until the age is set the son is evaluated against the strictest band.
             age_years=None,
-            vitalforge_person=config.vitalforge_person_son,
+            vitalforge_person=person_son,
             push_to_garmin=False,
         ),
     )
@@ -130,39 +190,23 @@ def _ensure_profiles(session: Session) -> list[Profile]:
 
 
 def _rebuild_program(session: Session, profile: Profile, settings: ProgramSettings, bundle, start: date) -> int:
-    plan = build_program(profile, settings, bundle, start)
-    identifier = program_id(profile.id)
+    """Re-plan one profile's block. One implementation, shared with Settings (D-098d).
 
-    existing_program = session.get(Program, identifier)
-    if existing_program is None:
-        session.add(plan.program)
-    else:
-        # `start_date` is the one field a rebuild must not touch: it is when this block began, and
-        # re-seeding is not starting over. Overwriting it with today made every re-seed look like
-        # a fresh block and would misdate anything PRP-04 counts from it.
-        for field in ("template", "weeks", "days_per_week", "session_minutes", "status"):
-            setattr(existing_program, field, getattr(plan.program, field))
-
-    # Only rows still waiting to be done are the plan's to remove. A session that was finished or
-    # deliberately skipped is history, not a slot: changing days-per-week reshapes the queue ahead
-    # of the user, and it must not erase what they already did behind them.
-    keep = {row.id for row in plan.sessions}
-    existing = session.exec(select(PlannedSession).where(PlannedSession.program_id == identifier)).all()
-    for row in existing:
-        if row.id not in keep and row.status == PLANNED:
-            session.delete(row)
-    for planned in plan.sessions:
-        current = session.get(PlannedSession, planned.id)
-        if current is None:
-            session.add(planned)
-        elif current.status == PLANNED:
-            current.rows_json = planned.rows_json
-            current.workout_id = planned.workout_id
-            current.day_type = planned.day_type
-    return plan.session_count
+    This used to be a second rebuild with its own rules: it deleted on ``status == "planned"``
+    alone, where PRP-03's rule also requires that nobody has started the session (D-093). Two
+    rebuilds that disagree about what may be deleted is one too many, so ``make seed`` and the
+    Settings screen now go through the same code and `start_date` is preserved in one place
+    (D-068d).
+    """
+    return rebuild_one(session, profile, settings, bundle, start)
 
 
-def seed(session: Session, path: Path = LIBRARY_DIR, reset: bool = False) -> SeedReport:
+def seed(
+    session: Session,
+    path: Path = LIBRARY_DIR,
+    reset: bool = False,
+    setup_complete: bool = True,
+) -> SeedReport:
     """Load the library and build one block per profile. Raises ``LibraryError`` on a bad library."""
     bundle = load_library(path)
     stamp = _now()
@@ -180,7 +224,7 @@ def seed(session: Session, path: Path = LIBRARY_DIR, reset: bool = False) -> See
 
     exercises = _upsert_exercises(session, dict(bundle.exercises), stamp)
     workouts = _upsert_workouts(session, dict(bundle.templates), stamp)
-    settings = _ensure_settings(session, stamp)
+    settings = _ensure_settings(session, stamp, setup_complete)
     profiles = _ensure_profiles(session)
     session.flush()
 
@@ -199,11 +243,12 @@ def main(argv: list[str] | None = None) -> int:
     """``python -m cadence.bibliotheque.seed``. One line out, non-zero on a bad library."""
     args = argv if argv is not None else sys.argv[1:]
     reset = "--reset" in args
+    complete = _setup_complete_from_env(args)
     engine = init_db()
     try:
         with Session(engine) as session:
-            report = seed(session, LIBRARY_DIR, reset=reset)
-    except (LibraryError, ProgramBuildError) as exc:
+            report = seed(session, LIBRARY_DIR, reset=reset, setup_complete=complete)
+    except (LibraryError, ProgramBuildError, SeedError) as exc:
         # Both mean the same thing to the person running `make seed`: nothing was written, and
         # here is why. A library that will not parse and a plan that will not validate are equally
         # not a seeded database, so neither may exit 0.

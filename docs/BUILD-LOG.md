@@ -43,3 +43,10 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Reviewer: no Highs; 4 Mediums (unscoped detail route, two definitions of "finished", domain importing web layer, swallowed errors) + 3 Lows fixed (D-107).
 - Final: 1277 passed, 58 e2e, 94% coverage, lint clean.
 - Squash-merged to main, tagged prp-04, pushed.
+
+## prp-03 — profiles-settings — 2026-09-07 (worktree, parallel with PRP-04)
+- Implementer built setup/settings screens, services, validation, rebuild, API (1158 tests, 57 e2e).
+- Tester added 159 tests (settings/profile adversarial matrices, e2e first-run flow); tightened the person-slug rule.
+- Reviewer: 2 Highs (orchestrator's D-099 made an 18 typo permanently strip youth rules — revised; silent rebuild skip when library missing) + 4 Mediums fixed; re-verify found the setup replay guard on the wrong route — orchestrator applied the 3-line fix + test.
+- Merged main (PRP-04) into the branch; exposed and fixed settings_from_rows discarding all keys on one bad value (D-115).
+- Final: 1527 passed, 77 e2e, 94% coverage. D-090..D-099, D-110..D-115. Squash-merged to main, tagged prp-03, pushed.

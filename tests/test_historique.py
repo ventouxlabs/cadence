@@ -18,7 +18,7 @@ from sqlmodel import Session as DbSession
 from cadence.historique.scorecard import current_streak, weekly_scorecard
 from cadence.historique.sparkline import HEIGHT, WIDTH, sparkline
 from cadence.historique.trend import TrendSeries, body_comp_trend
-from cadence.profils.tables import PROFILE_ME, PROFILE_SON, Profile
+from cadence.profils.tables import PROFILE_ME, PROFILE_SON, Profile, Setting
 from cadence.programme.tables import PlannedSession
 from cadence.seance.catalog import band_rules
 from cadence.seance.status import good_enough_after
@@ -34,8 +34,16 @@ WEEK_MONDAY = date(2026, 9, 7)
 
 
 def _profiles(db: DbSession) -> None:
+    """The two profiles, on an app that has been set up.
+
+    ``setup_complete`` is written because PRP-03's gate redirects every HTML screen to ``/setup``
+    until it is true, and History is one of them. A household with sessions in its history has
+    self-evidently been through Setup, so saying so here is describing the fixture accurately
+    rather than working around the gate.
+    """
     db.add(Profile(id=PROFILE_ME, display_name="Me", kind="adult"))
     db.add(Profile(id=PROFILE_SON, display_name="Son", kind="youth", age_years=None))
+    db.add(Setting(key="setup_complete", value_json="true", updated_at=datetime.now(UTC).isoformat()))
     db.commit()
 
 

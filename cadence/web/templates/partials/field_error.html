@@ -1,0 +1,5 @@
+{# One inline error line, under the field that caused it. Never a separate page: on a phone,
+   losing the form to an error screen means retyping everything that was right. #}
+{% if message %}
+<p class="field-error" role="alert" data-error-for="{{ field }}">⚠ {{ message }}</p>
+{% endif %}

@@ -15,7 +15,9 @@ from sqlmodel import Session, select
 
 from cadence.bibliotheque import seed as seed_module
 from cadence.bibliotheque.loader import LibraryError
+from cadence.config import get_settings
 from cadence.db import ExerciseRecord, WorkoutRecord, init_db
+from cadence.profils.settings import SETTING_KEYS
 from cadence.profils.tables import Profile, Setting
 from cadence.programme.tables import PlannedSession, Program
 
@@ -57,7 +59,7 @@ def test_running_make_seed_twice_changes_nothing(seeded_env, settings, capsys) -
         assert len(fresh.exec(select(WorkoutRecord)).all()) == 11
         assert len(fresh.exec(select(Profile)).all()) == 2
         assert len(fresh.exec(select(Program)).all()) == 2
-        assert len(fresh.exec(select(Setting)).all()) == 8
+        assert len(fresh.exec(select(Setting)).all()) == len(SETTING_KEYS)
 
 
 def test_seed_main_accepts_reset(seeded_env, capsys) -> None:
@@ -157,3 +159,61 @@ def test_a_done_planned_session_survives_a_re_seed(settings) -> None:
         assert kept.status == "done"
         assert kept.rows_json == '[{"position": 1, "exercise_id": "bear-crawl", "note": "as performed"}]'
         assert len(session.exec(select(PlannedSession)).all()) == 32
+
+
+def test_seed_marks_setup_complete_so_make_dev_opens_today(settings) -> None:
+    """D-091: demo data is set-up data, or `make seed && make dev` lands on a Setup screen."""
+    engine = init_db(settings)
+    with Session(engine) as session:
+        seed_module.seed(session, Path("library"))
+        stored = session.get(Setting, "setup_complete")
+        assert stored is not None
+        assert stored.value_json == "true"
+
+
+def test_a_fresh_seed_forces_the_first_run_back(settings) -> None:
+    """`--fresh` is the true first run, and it clears a `setup_complete` an earlier seed wrote."""
+    engine = init_db(settings)
+    with Session(engine) as session:
+        seed_module.seed(session, Path("library"))
+        seed_module.seed(session, Path("library"), setup_complete=False)
+        assert session.get(Setting, "setup_complete").value_json == "false"
+
+
+def test_the_fresh_flag_is_read_from_the_command_line_and_the_environment(monkeypatch) -> None:
+    assert seed_module._setup_complete_from_env([]) is True
+    assert seed_module._setup_complete_from_env(["--fresh"]) is False
+    monkeypatch.setenv("CADENCE_SEED_SETUP_COMPLETE", "0")
+    assert seed_module._setup_complete_from_env([]) is False
+    monkeypatch.setenv("CADENCE_SEED_SETUP_COMPLETE", "1")
+    assert seed_module._setup_complete_from_env([]) is True
+
+
+def test_a_bad_person_slug_in_the_env_stops_the_seed(settings, monkeypatch) -> None:
+    """D-114. The one entry point that never passed through ``validate_profile_patch``.
+
+    ``_ensure_profiles`` writes ``VITALFORGE_PERSON_ME`` / ``_SON`` straight onto the profile rows,
+    so a bad slug in ``.env`` reached the database however carefully the screen was validated. It
+    ends up interpolated into ``/p/{slug}/api/...`` by PRP-06 exactly like a typed one, so operator
+    input is checked like any other input: one line out, exit 1, nothing written.
+    """
+    from sqlmodel import select
+
+    monkeypatch.setenv("VITALFORGE_PERSON_ME", "../evil")
+    get_settings.cache_clear()
+    engine = init_db(settings)
+    with pytest.raises(seed_module.SeedError, match="VITALFORGE_PERSON_ME"), Session(engine) as session:
+        seed_module.seed(session, Path("library"))
+    with Session(engine) as session:
+        assert session.exec(select(Profile)).all() == []
+
+
+def test_a_blank_person_slug_in_the_env_is_still_fine(settings, monkeypatch) -> None:
+    """D-017: blank stays blank, and blank is not a bad slug."""
+    monkeypatch.setenv("VITALFORGE_PERSON_ME", "")
+    get_settings.cache_clear()
+    engine = init_db(settings)
+    with Session(engine) as session:
+        report = seed_module.seed(session, Path("library"))
+        assert report.profiles == ("me", "son")
+        assert session.get(Profile, "me").vitalforge_person == ""

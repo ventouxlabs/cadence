@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from sqlmodel import Field, SQLModel
 
+# The three states of `planned_session.status` (architecture section 3). Constants rather than
+# literals so the rebuild rule, which turns on the difference between them, cannot be written
+# against a typo.
 PLANNED = "planned"
+DONE = "done"
+SKIPPED = "skipped"
+
 ACTIVE = "active"
 
 

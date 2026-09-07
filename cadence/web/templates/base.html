@@ -18,6 +18,11 @@
 {% set tab_base = tab_base|default("/today") %}
 {% set tab_profile = profile_key|default("me") %}
 <header class="topbar">
+  {% if hide_tabs %}
+  {# Setup. Nothing in the bar offers a way past the screen: every link here leads somewhere the
+     gate would only bounce back, so the brand is plain text until the app has been set up. #}
+  <span class="brand">Cadence</span>
+  {% else %}
   {# Today is the landing screen, so the brand goes there and History is the one extra link. #}
   <a class="brand" href="/today?profile={{ tab_profile }}">Cadence</a>
   <nav class="tabs" aria-label="Profile">
@@ -25,9 +30,11 @@
     <a class="tab{% if key == profile_key %} tab-on{% endif %}" href="{{ tab_base }}?profile={{ key }}"
        {% if key == profile_key %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
+    <a class="tab tab-gear" href="/settings" aria-label="Settings">⚙</a>
   </nav>
   <a class="section{% if tab_base == "/history" %} section-on{% endif %}" href="/history?profile={{ tab_profile }}"
      {% if tab_base == "/history" %}aria-current="page"{% endif %}>History</a>
+  {% endif %}
 </header>
 <p class="banner" id="offline-banner" hidden>Saved on this phone — will sync.</p>
 <main id="main">

@@ -381,6 +381,19 @@
     queued.then(function () { window.location.href = "/done/" + sessionId; });
   }
 
+  /* A rejected form still has to render. HTMX swaps 2xx only, so a 422 carrying the settings
+     form with its errors in it would be dropped and the user would tap Save and see nothing
+     change. Only the settings form opts in: everywhere else a 4xx really is "do not swap". */
+  document.body.addEventListener("htmx:beforeSwap", function (event) {
+    var detail = event.detail || {};
+    var status = detail.xhr ? detail.xhr.status : 0;
+    var target = event.target;
+    if (status !== 422) return;
+    if (!target || !target.closest || !target.closest("#settings-form")) return;
+    detail.shouldSwap = true;
+    detail.isError = false;
+  });
+
   /* An HTMX request that actually landed retires the entry the same change queued. */
   document.body.addEventListener("htmx:afterRequest", function (event) {
     var element = event.target.closest ? event.target.closest("[data-op-key]") : null;

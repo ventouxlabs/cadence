@@ -165,10 +165,16 @@ async def test_root_redirects_to_today_once_seeded(seeded_client: httpx.AsyncCli
     assert response.headers["location"] == "/today?profile=me"
 
 
-async def test_root_explains_itself_before_seeding(client: httpx.AsyncClient) -> None:
+async def test_root_sends_an_unset_up_install_to_setup(client: httpx.AsyncClient) -> None:
+    """PRP-03 replaces D-072's interim page: the front door gates on ``setup_complete`` again.
+
+    Before, an unseeded install got a page naming ``make seed`` because ``/setup`` did not exist
+    yet. It does now, and it is the screen that asks for the son's age - the one question the app
+    cannot be used correctly without.
+    """
     response = await client.get("/")
-    assert response.status_code == 200
-    assert "make seed" in response.text
+    assert response.status_code == 303
+    assert response.headers["location"] == "/setup"
 
 
 async def test_service_worker_is_served_from_the_root(seeded_client: httpx.AsyncClient) -> None:

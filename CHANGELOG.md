@@ -4,6 +4,20 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 
 ## [Unreleased]
 
+### prp-03 — profiles, Setup, Settings and the youth wiring (2026-09-06)
+- `cadence/profils/` services over PRP-01's tables: `get_settings` / `update_settings`, `get_profile` / `update_profile`, `apply_household` (one form, one transaction), `youth_ruleset_for`, `has_overhead_anchor`, `bodyweight_kg`, `refresh_age_bands` on boot.
+- Setup gate restored: `GET /` sends an install to `/setup` until `setup_complete`, and a dependency on the HTML routers stops `/today` and `/settings` being deep-linked past it. `make seed` now marks demo data set up; `make seed --fresh` is the true first run (D-091).
+- `GET|POST /setup` and `GET|POST /settings` over one shared form template, `POST /settings/weights/preview` for the live parse, plus the `import_section` / `generate_section` containers and the `#import-result` / `#generate-preview` ids PRP-08 renders into.
+- `GET|PUT /api/settings` and `GET|PUT /api/profiles/{id}`: partial patches, unknown keys named in a 422, the four-id equipment whitelist with `bodyweight` not un-tickable, days 2–6, length 15/30/45, youth ages 3–19, and `kind` refused outright.
+- Rebuild on a relevant change that keeps history: only unstarted `planned` sessions are replaced, finished ones and their `session` rows survive, the new work follows the last completed slot, and `program.start_date` is never touched (D-093).
+- `display_unit` (kg/lb) as a ninth setting key, converted in one place — which fixed `format_load` labelling kilograms as pounds without converting them (D-090).
+- Youth wiring end to end: band from age, strictest until set, `is_youth()` template guard, and no body-composition or appearance language on the son's screens.
+- An age never changes which rules protect a profile: a youth profile past the band table uses the loosest youth band, and moving to the adult rules is an explicit, confirmed, reversible control plus `PUT /api/profiles/{id}/kind` (D-099).
+- `make seed` and Settings share one rebuild path (D-110); a skipped day spends no slot and a rebuild never empties the queue (D-111); `vitalforge_person` mirrors VitalForge's own slug rule (D-112); a rebuild that cannot run answers 503 rather than a silent success (D-113).
+- One error line per person-slug box rather than one for the section, and the env slugs `make seed` writes are checked like typed ones (D-114).
+- Merged `main` after PRP-04 landed: History is behind the setup gate like Today, the top bar keeps both PRP-04's History link and PRP-03's setup-screen suppression, and acceptance test 22 is live against the real `/history`.
+- Decisions D-090 to D-114. Numbering note: this PRP's original D-100 became D-110, because PRP-04 had already taken D-100 to D-107 in its own worktree.
+
 ### prp-02 — Today checklist, Done and the offline PWA (2026-09-06)
 - `session` / `session_row` tables and `cadence/seance/` (today resolution, ticks, adjust, felt, done, derived completion, cached library reads); session created on first render, `started_at` on first tick.
 - HTML UI in `cadence/web/`: `GET /` front door, `/today?profile=me|son|together`, HTMX partials for tick, adjust, felt and Done, `/done/{id}` three-line summary, plain-form fallback with JavaScript off.
@@ -44,6 +58,13 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 - `session`/`session_row` tables and `cadence/seance/` services; idempotent JSON replay targets; finished-session guard on every write path; youth band rules never fail open (503).
 - PWA: manifest, icons, service worker (network-first Today with cache fallback, precached offline Done page), IndexedDB queue for tick/adjust/felt/done with in-flight marking and 4xx parking; HTMX 2.0.10 vendored; GZip; cold `/today` 27.6 KB gzip of 60 KB.
 - 1087 tests, 45 Playwright tests at 390×844 (and 1024×768), 94% coverage.
+
+### prp-03 — profiles-settings (2026-09-07)
+- First-run `/setup` and editable `/settings` (son's age, equipment locked to the whitelist with bodyweight always on, `weights_available` with live parse preview, days/week, session length, push son's sessions to Garmin (off; son has no Garmin, D-069), display unit, VitalForge person slugs); `/` gate on `setup_complete`; `POST /setup` not replayable.
+- `GET/PUT /api/settings`, `GET/PUT /api/profiles/{id}`, explicit confirmed `PUT /api/profiles/{id}/kind`; youth at 18+ stays youth on the 14–17 band (D-099 revised).
+- One rebuild path (`profils/rebuild.py`): done sessions kept, `start_date` preserved, unstarted sessions replaced, next block started when the plan is exhausted; a missing library refuses the rebuild (503) instead of leaving stale loads.
+- Person slugs validated to VitalForge's rule; settings survive a corrupt key; `lb` display converts loads.
+- 1527 tests, 77 Playwright, 94% coverage.
 
 ### prp-04 — history-scorecard (2026-09-06)
 - History screen at `GET /history?profile=me|son|together`: weekly scorecard (done vs `days_per_week`, one dot per session, streak and best), the finished-session list with date, day name, N of M, duration, how it felt and a sync badge, and cards that expand in place to the per-exercise rows (HTMX, and an ordinary link with JavaScript off).

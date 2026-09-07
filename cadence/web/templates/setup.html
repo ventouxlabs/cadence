@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block head_extra %}<link rel="stylesheet" href="/static/settings.css">{% endblock %}
+{% block title %}Set up Cadence{% endblock %}
+{% block content %}
+<section class="page">
+  <h1 class="page-head">Set up Cadence</h1>
+  <p class="page-sub">Two profiles, five questions.</p>
+  {% include "partials/settings_form.html" %}
+</section>
+{% endblock %}

@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
+from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from sqlmodel import Session
 
 from cadence.db import get_session
 from cadence.seance.catalog import load_settings, setup_complete
-from cadence.web.rendering import STATIC_DIR, templates
+from cadence.web.rendering import STATIC_DIR
 
 router = APIRouter(tags=["pwa"])
 
@@ -24,21 +24,11 @@ JS_TYPE = "application/javascript"
 
 
 @router.get("/")
-def root(request: Request, db: Annotated[Session, Depends(get_session)]) -> Response:
-    """Today once the app is set up, and a page saying how to set it up when it is not.
-
-    PRP-03 owns ``/setup``. Redirecting there now would 404 the front door, so until that lands
-    an unseeded install gets a page naming the command rather than a broken hop (D-072).
-    """
-    if setup_complete(db, load_settings(db)):
+def root(db: Annotated[Session, Depends(get_session)]) -> Response:
+    """Setup until the son's age has been asked for, Today once it has (architecture section 4)."""
+    if setup_complete(load_settings(db)):
         return RedirectResponse("/today?profile=me", status_code=SEE_OTHER)
-    body = templates.get_template("message.html").render(
-        request=request,
-        message="No profiles yet. Run `make seed` to load the library and build the first block.",
-        profile_key="me",
-        view=None,
-    )
-    return HTMLResponse(body, status_code=200)
+    return RedirectResponse("/setup", status_code=SEE_OTHER)
 
 
 @router.get("/sw.js", include_in_schema=False)

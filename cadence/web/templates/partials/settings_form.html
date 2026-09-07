@@ -1,0 +1,203 @@
+{# The whole Setup / Settings form. One template for both screens (PRP-03): the fields are the
+   same, so a change to a control cannot appear on one and not the other.
+
+   `mode` is "setup" or "settings". Everything works with JavaScript off: the segmented controls
+   are radio inputs, the preview is the only HTMX on the page, and there is one Save. #}
+{% macro toggle(name, on, label) %}
+<div class="segmented segmented-two" role="group" aria-label="{{ label }}">
+  <label class="seg{% if not on %} seg-on{% endif %}">
+    <input type="radio" name="{{ name }}" value="0" {% if not on %}checked{% endif %}>
+    <span>Off</span>
+  </label>
+  <label class="seg{% if on %} seg-on{% endif %}">
+    <input type="radio" name="{{ name }}" value="1" {% if on %}checked{% endif %}>
+    <span>On</span>
+  </label>
+</div>
+{% endmacro %}
+<form id="settings-form" class="settings" method="post" action="{{ action }}"
+      hx-post="{{ action }}" hx-target="#settings-form" hx-swap="outerHTML">
+
+  {% if form_error %}
+  {# Not a field error: the save was refused as a whole, so it is said once at the top rather
+     than pinned under a control that was not the problem. #}
+  <p class="form-error" role="alert" data-form-error>⚠ {{ form_error }}</p>
+  {% endif %}
+
+  <section class="card" aria-labelledby="age-head">
+    <h2 class="card-head" id="age-head">{{ son.display_name }}'s age</h2>
+    <div class="field-row">
+      <input class="input input-age" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3"
+             id="son_age" name="son_age" value="{{ form.son_age }}"
+             aria-describedby="age-help" aria-label="{{ son.display_name }}'s age in years"
+             {% if mode == 'setup' %}autofocus required{% endif %}>
+      <span class="unit-label">years</span>
+      {% if mode == 'setup' %}<span class="needed">needed</span>{% endif %}
+    </div>
+    {% with field = "age_years", message = errors.get("age_years") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+    {# D-099: an age never changes which rules apply. It can only change which youth band does,
+       so the note explains the band rather than announcing a promotion nobody asked for. #}
+    {% if not is_youth(son) %}
+    <p class="card-note" id="age-help" data-adult-note>
+      Adult rules apply to this profile.
+    </p>
+    {% elif son_past_bands %}
+    <p class="card-note" id="age-help" data-older-note>
+      {{ son.display_name }} is 18+; youth rules (14–17) still apply until you mark this profile as an adult.
+    </p>
+    {% else %}
+    <p class="card-note" id="age-help">Until this is set he trains on the strictest rules.</p>
+    {% endif %}
+  </section>
+
+  <section class="card" aria-labelledby="kit-head">
+    <h2 class="card-head" id="kit-head">Equipment</h2>
+    <div class="checks">
+      {% for id, label in equipment_choices %}
+      <label class="check{% if id in locked_equipment %} check-locked{% endif %}">
+        {% if id in locked_equipment %}
+        {# Disabled controls are not submitted, so the value rides in on a hidden input. Without
+           it the form would post an equipment list the person was never allowed to change. #}
+        <input type="checkbox" checked disabled aria-describedby="kit-locked">
+        <input type="hidden" name="equipment" value="{{ id }}">
+        {% else %}
+        <input type="checkbox" name="equipment" value="{{ id }}" {% if id in form.equipment %}checked{% endif %}>
+        {% endif %}
+        <span>{{ label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <p class="card-note" id="kit-locked">Bodyweight is always on — every session falls back to it.</p>
+    {% with field = "equipment", message = errors.get("equipment") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+
+    <h3 class="field-head"><label for="weights_available">Weights available</label></h3>
+    <input class="input" type="text" id="weights_available" name="weights_available"
+           value="{{ form.weights_available }}" maxlength="500"
+           placeholder="DB 5-52.5 lb adj, KB 16/24 kg"
+           hx-post="/settings/weights/preview" hx-trigger="keyup changed delay:400ms"
+           hx-target="#weights-preview" hx-swap="outerHTML">
+    {% with field = "weights_available", message = errors.get("weights_available") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+    {% include "partials/weights_preview.html" %}
+  </section>
+
+  <section class="card" aria-labelledby="plan-head">
+    <h2 class="card-head" id="plan-head">Days per week</h2>
+    <div class="segmented" role="group" aria-label="Days per week">
+      {% for choice in days_choices %}
+      <label class="seg{% if form.days_per_week == choice %} seg-on{% endif %}">
+        <input type="radio" name="days_per_week" value="{{ choice }}"
+               {% if form.days_per_week == choice %}checked{% endif %}>
+        <span>{{ choice }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    {% with field = "days_per_week", message = errors.get("days_per_week") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+
+    <h3 class="field-head">Session length</h3>
+    <div class="segmented" role="group" aria-label="Session length in minutes">
+      {% for choice in minutes_choices %}
+      <label class="seg{% if form.session_minutes == choice %} seg-on{% endif %}">
+        <input type="radio" name="session_minutes" value="{{ choice }}"
+               {% if form.session_minutes == choice %}checked{% endif %}>
+        <span>{{ choice }}</span>
+      </label>
+      {% endfor %}
+      <span class="unit-label">minutes</span>
+    </div>
+    {% with field = "session_minutes", message = errors.get("session_minutes") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+  </section>
+
+  <section class="card" aria-labelledby="anchor-head">
+    <h2 class="card-head" id="anchor-head">Pull-up bar or sturdy beam?</h2>
+    {{ toggle("has_overhead_anchor", form.has_overhead_anchor, "Pull-up bar or sturdy beam") }}
+    <p class="card-note">Without one, the dead hang is recorded as unavailable rather than missed.</p>
+  </section>
+
+  <section class="card" aria-labelledby="garmin-head">
+    <h2 class="card-head" id="garmin-head">Push {{ son.display_name|lower }}'s sessions to Garmin</h2>
+    {{ toggle("push_son_to_garmin", form.push_son_to_garmin, "Push his sessions to Garmin") }}
+    <p class="card-note">
+      His sessions are always saved in VitalForge. This only controls whether they also appear in
+      your Garmin account. He has no Garmin account of his own, so when this is on they file under
+      yours, named with his.
+    </p>
+  </section>
+
+  <section class="card" aria-labelledby="unit-head">
+    <h2 class="card-head" id="unit-head">Show weights in</h2>
+    <div class="segmented" role="group" aria-label="Show weights in">
+      {% for choice in unit_choices %}
+      <label class="seg{% if form.display_unit == choice %} seg-on{% endif %}">
+        <input type="radio" name="display_unit" value="{{ choice }}"
+               {% if form.display_unit == choice %}checked{% endif %}>
+        <span>{{ choice }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    <p class="card-note">Display only. Everything is stored in kilograms.</p>
+  </section>
+
+  {% if mode == 'settings' %}
+  <section class="card" aria-labelledby="me-head">
+    <h2 class="card-head" id="me-head">{{ me.display_name }}</h2>
+    {# Guarded, not omitted by hand: no body metric renders on a youth profile card, ever
+       (docs/brief.md, architecture section 5). #}
+    {% if not is_youth(me) %}
+    <h3 class="field-head"><label for="bodyweight_kg">Bodyweight</label></h3>
+    <div class="field-row">
+      <input class="input input-age" type="text" inputmode="decimal" id="bodyweight_kg"
+             name="bodyweight_kg" value="{{ form.bodyweight_kg }}" maxlength="6">
+      <span class="unit-label">kg</span>
+    </div>
+    <p class="card-note">Optional. Used for the percentage load caps, never shown to anyone else.</p>
+    {% with field = "bodyweight_kg", message = errors.get("bodyweight_kg") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="card" aria-labelledby="people-head">
+    <h2 class="card-head" id="people-head">VitalForge people</h2>
+    {# One error line per input, not one for the section: the two slugs are different fields on
+       different profiles, and a single line cannot say which of them is the bad one. #}
+    <div class="field-row">
+      <label class="person-label" for="person_me">{{ me.display_name }}</label>
+      <input class="input" type="text" id="person_me" name="person_me" value="{{ form.person_me }}" maxlength="32">
+    </div>
+    {% with field = "person_me", message = errors.get("person_me") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+    <div class="field-row">
+      <label class="person-label" for="person_son">{{ son.display_name }}</label>
+      <input class="input" type="text" id="person_son" name="person_son" value="{{ form.person_son }}" maxlength="32">
+    </div>
+    {% with field = "person_son", message = errors.get("person_son") %}
+      {% include "partials/field_error.html" %}
+    {% endwith %}
+    <p class="card-note">Blank stays blank — Cadence never guesses a slug from a name.</p>
+  </section>
+
+  {% if mode == 'settings' %}
+  {% include "partials/import_section.html" %}
+  {% include "partials/generate_section.html" %}
+  {% endif %}
+
+  <div class="save-bar">
+    <button class="save" type="submit">{% if mode == 'setup' %}Start training{% else %}Save{% endif %}</button>
+    {% if mode == 'settings' %}
+    <p class="save-note">Changing days per week or length will rebuild the plan.</p>
+    {% endif %}
+    {% if saved %}<p class="save-note save-ok" role="status">Saved.</p>{% endif %}
+  </div>
+</form>

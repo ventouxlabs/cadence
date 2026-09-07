@@ -17,6 +17,10 @@ BLOCK_WEEKS = 4
 
 YOUTH_BANDS: tuple[AgeBand, ...] = (AgeBand.U10, AgeBand.AGE_10_13, AgeBand.AGE_14_17)
 STRICTEST_YOUTH_BAND = AgeBand.U10
+# The band a youth profile lands on once its age runs past the section 3.1 table (D-099). It is
+# the loosest *youth* band, not the adult rule set: an age typed wrong must never be able to
+# strip a child's protections, and only a deliberate change of `kind` does that.
+OLDEST_YOUTH_BAND = AgeBand.AGE_14_17
 
 
 def band_for_age(age_years: int | None) -> AgeBand:
@@ -36,15 +40,24 @@ def age_band(profile: Profile) -> AgeBand:
     """The band this profile is evaluated against (D-023).
 
     The parent profile is always ``adult`` (section 3.1) whatever its age says. A youth profile
-    with no recorded age is ``u10`` (section 3.8), and so is a youth profile whose age computes to
-    ``adult`` - the same coercion the validator's ``effective_band`` makes for the same situation
-    (D-037b). A profile marked youth never leaves the youth rules by arithmetic, and when the two
-    facts on it disagree the strictest band wins rather than the loosest.
+    with **no recorded age** is ``u10`` (section 3.8): nothing is known, so nothing is assumed. A
+    youth profile whose age runs past the table is ``age_14_17`` (D-099) - still youth, still
+    capped, just at the loosest youth band.
+
+    Those two unknowns are not the same unknown, which is why they answer differently. An absent
+    age is a question nobody has answered; an age of 19 is an answer that the band table simply
+    does not extend to, and treating it as "under ten" punishes a correct entry. Neither reading
+    lets a youth profile out of the youth rules: only changing ``kind`` does that, and only
+    deliberately (``PUT /api/profiles/{id}/kind``).
+
+    The validator agrees with both. ``effective_band`` coerces only when the band it is handed is
+    ``adult``, and this never hands it that for a youth profile, so the engine cannot offer a row
+    the gate would then reject - which was D-066's whole concern.
     """
     if profile.kind != "youth":
         return AgeBand.ADULT
     band = band_for_age(profile.age_years)
-    return STRICTEST_YOUTH_BAND if band is AgeBand.ADULT else band
+    return OLDEST_YOUTH_BAND if band is AgeBand.ADULT else band
 
 
 def effective_cap(rules: YouthRuleSet, load_unit: LoadUnit, bodyweight_kg: float | None) -> float | None:
@@ -67,6 +80,7 @@ def week_of_block(completed_sessions_in_block: int, days_per_week: int) -> int:
 
 __all__ = [
     "BLOCK_WEEKS",
+    "OLDEST_YOUTH_BAND",
     "STRICTEST_YOUTH_BAND",
     "YOUTH_BANDS",
     "age_band",

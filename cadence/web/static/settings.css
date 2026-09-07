@@ -1,0 +1,274 @@
+/* Setup and Settings. Same rules as Today: one-handed at 390px, every target at least --tap tall,
+   no webfont, no image, no external request. Loaded only by these two screens, so Today's page
+   weight is untouched. */
+
+.page {
+  padding: 12px 12px 24px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.page-head {
+  margin: 8px 0 2px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.page-sub {
+  margin: 0 0 14px;
+  color: var(--ink-soft);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 0 0 12px;
+}
+
+.card-head {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.field-head {
+  margin: 16px 0 6px;
+  font-size: 16px;
+}
+
+.card-note {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.card-disabled {
+  opacity: 0.62;
+  border-style: dashed;
+}
+
+/* ----------------------------------------------------------------- text fields */
+
+.input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.input-age {
+  width: 6ch;
+  font-size: 22px;
+  text-align: center;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+.unit-label,
+.needed {
+  color: var(--ink-soft);
+}
+
+.needed {
+  margin-left: auto;
+  font-size: 15px;
+}
+
+.person-label {
+  min-width: 4.5ch;
+  color: var(--ink-soft);
+}
+
+.field-error {
+  margin: 6px 0 0;
+  color: #9b1c1c;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+/* ------------------------------------------------------------------- checkboxes */
+
+.checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.check input {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+
+.check-locked {
+  background: #eef1f3;
+  color: var(--ink-soft);
+}
+
+/* ------------------------------------------------- segmented controls (radios) */
+
+.segmented {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.seg {
+  flex: 1 1 auto;
+  min-width: 56px;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  font-size: 18px;
+}
+
+.segmented-two .seg {
+  flex: 1 1 40%;
+}
+
+/* The radio itself is the control for assistive tech and for keyboard focus; the label is what a
+   thumb hits. Hidden with clip rather than display:none, which would take it out of the tab order
+   and off the accessibility tree. */
+.seg input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.seg-on {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.seg:has(input:focus-visible) {
+  outline: 3px solid #0b57d0;
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- parse preview */
+
+.preview {
+  margin: 8px 0 0;
+}
+
+.preview-line {
+  margin: 4px 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.preview-ok {
+  color: var(--go);
+}
+
+.preview-warn {
+  color: #8a5300;
+}
+
+.preview-muted {
+  color: var(--ink-soft);
+}
+
+/* --------------------------------------------------------------------- the save */
+
+.save-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+
+.save {
+  width: 100%;
+  min-height: 60px;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--go-ink);
+  background: var(--go);
+  border: none;
+  border-radius: 12px;
+}
+
+.save-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.save-ok {
+  color: var(--go);
+  font-weight: 600;
+}
+
+.tab-gear {
+  font-size: 18px;
+}
+
+/* Settings scrolls to its own end; Today's fixed footer is not on this page. */
+body:has(.settings) {
+  padding-bottom: 24px;
+}
+
+/* The rule-set control. Quieter than Save on purpose: it is not the button anyone came here to
+   press, and it is the one that changes which limits protect a child. */
+.card-rules {
+  border-color: var(--ink-soft);
+}
+
+.kind-form {
+  margin: 12px 0 0;
+}
+
+.kind-form .check {
+  margin: 0 0 10px;
+}
+
+.save-quiet {
+  background: var(--card);
+  color: var(--ink);
+  border: 2px solid var(--ink-soft);
+}
+
+.form-error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #9b1c1c;
+  border-radius: 10px;
+  color: #9b1c1c;
+  background: #fdf3f3;
+  line-height: 1.35;
+}

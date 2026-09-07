@@ -105,13 +105,12 @@ def display_unit(settings: ProgramSettings) -> str:
     return str(value) if value else DEFAULT_DISPLAY_UNIT
 
 
-def setup_complete(session: Session, settings: ProgramSettings) -> bool:
+def setup_complete(settings: ProgramSettings) -> bool:
     """Whether ``GET /`` may go straight to Today.
 
-    PRP-03 ships the setup screen and the setting that gates it. Until then a stored
-    ``setup_complete`` still wins, and its absence is read as "set up" when both seeded profiles
-    exist -- redirecting to a route this PRP does not serve would 404 the front door (D-072).
+    One fact, one answer: the stored setting, which only a successful ``POST /setup`` sets. D-072's
+    interim "two profiles exist means set up" branch is gone now that PRP-03 serves ``/setup`` --
+    it was there to stop the front door redirecting to a route that did not exist, and keeping it
+    would have let a seeded install skip the one screen the son's age is asked on.
     """
-    if settings.setup_complete:
-        return True
-    return len(session.exec(select(Profile)).all()) >= 2
+    return settings.setup_complete

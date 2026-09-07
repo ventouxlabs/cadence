@@ -11,6 +11,8 @@ from typing import Any
 
 from fastapi.templating import Jinja2Templates
 
+from cadence.programme.ladder import LB_TO_KG
+
 # Re-exported: the day names are vocabulary two packages share, so they live beside the enum
 # they name rather than in the module that owns the Jinja environment.
 from cadence.schema.labels import DAY_TYPE_LABELS as DAY_TYPE_LABELS
@@ -22,11 +24,33 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 PROFILE_TABS: tuple[tuple[str, str], ...] = (("me", "Me"), ("son", "Son"), ("together", "Both"))
 
 
+def is_youth(profile: Any) -> bool:
+    """The youth guard, as one callable every template shares.
+
+    A *function* and not the page-level ``youth`` flag the PRP sketches, because Together renders
+    two profiles in one document: a single boolean would either hide the parent's numbers or show
+    the son's, and PRP-02 already carries the right granularity on each column (D-094).
+    """
+    return bool(profile is not None and getattr(profile, "kind", None) == "youth")
+
+
+# Pounds are shown to the nearest half pound. Finer than that is noise on a dumbbell rack, and
+# coarser loses the 2.5 lb step the adjustable set actually has.
+LB_STEP = 0.5
+
+
 def format_load(value: float | None, unit: str = "kg") -> str:
-    """``14 kg``, ``2.5 kg``, or nothing at all for a bodyweight row."""
+    """``14 kg``, ``2.5 kg``, ``31 lb``, or nothing at all for a bodyweight row.
+
+    The **only** place a stored kilogram becomes a displayed pound (PRP-03 risk 5). The value on
+    the row is always kg; ``unit`` chooses how it is written, and no service ever sees the result.
+    Registered as the ``load`` Jinja filter as well, so there is one conversion and not two: an
+    earlier version labelled the number without converting it, which rendered 14 kg as "14 lb".
+    """
     if value is None:
         return ""
-    text = f"{value:.1f}".rstrip("0").rstrip(".")
+    shown = round(value / LB_TO_KG / LB_STEP) * LB_STEP if unit == "lb" else value
+    text = f"{shown:.1f}".rstrip("0").rstrip(".")
     return f"{text} {unit}"
 
 
@@ -62,4 +86,6 @@ templates.env.lstrip_blocks = True
 templates.env.globals["day_label"] = day_label
 templates.env.globals["prescription"] = prescription
 templates.env.globals["format_load"] = format_load
+templates.env.filters["load"] = format_load
+templates.env.globals["is_youth"] = is_youth
 templates.env.globals["PROFILE_TABS"] = PROFILE_TABS
