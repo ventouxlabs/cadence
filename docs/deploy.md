@@ -166,7 +166,7 @@ ssh vm-201 'cd /opt/cadence && ./scripts/backup.sh'
 | Application log | `docker compose logs -f cadence` on VM-201 |
 | Rotated files | `/var/lib/docker/containers/<id>/<id>-json.log`, 10 MB × 3 (prod overlay) |
 | Backup cron log | `/var/log/cadence-backup.log` |
-| Health state | `docker inspect --format '{{json .State.Health}}' cadence \| jq .` |
+| Health state | `docker inspect --format '{{json .State.Health}}' cadence \| jq .` — keep it scoped like this; see the warning at the end of the troubleshooting table below. |
 
 ---
 
