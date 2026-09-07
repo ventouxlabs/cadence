@@ -24,6 +24,8 @@ from cadence.schema import AgeBand, Exercise, YouthRules, YouthRuleSet
 
 ENV_VARS = (
     "CADENCE_DB_PATH",
+    "CADENCE_ENV",
+    "CADENCE_PERIODIC_SYNC",
     "CADENCE_HOST",
     "CADENCE_PORT",
     "CADENCE_VITALFORGE_MODE",
@@ -41,6 +43,9 @@ ENV_VARS = (
 
 LIBRARY_PATH = Path(__file__).resolve().parents[1] / "library"
 YOUTH_RULES_PATH = LIBRARY_PATH / "youth_rules.yaml"
+
+# A fake token, and the only one this suite ever sees. Tests assert it never reaches a log.
+VF_TOKEN = "vf-test-token-abc123"
 
 
 @pytest.fixture
@@ -82,6 +87,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 def settings(db_path: Path, clean_env: None) -> Settings:
     return Settings(
         CADENCE_DB_PATH=db_path,
+        CADENCE_ENV="test",
         CADENCE_VITALFORGE_MODE="mock",
         VITALFORGE_TOKEN="",
         OMNIROUTE_KEY="",
@@ -201,3 +207,112 @@ async def aged_son_client(aged_son: FastAPI) -> AsyncIterator[httpx.AsyncClient]
     transport = httpx.ASGITransport(app=aged_son)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+# --------------------------------------------------------------- PRP-06: no real network, ever
+#
+# PRP-06 section 5.6: an unmocked host would otherwise hang CI for the client's full five-second
+# timeout on every call. ``assert_all_mocked`` turns that into an immediate, named failure.
+# ``httpx.ASGITransport`` is untouched by respx, so the in-process app clients still work.
+
+
+@pytest.fixture(autouse=True)
+def forget_mock_payloads() -> Iterator[None]:
+    """Empty the mock VitalForge's recorder between tests.
+
+    ``mock.POSTED`` is module-level, because the fake stands in for a remote service and "what
+    did we send it" is a question about that service rather than about a client instance. That
+    makes it shared state across the suite, so a test asserting on the last payload would
+    otherwise depend on which tests ran before it.
+    """
+    from cadence.vitalforge import mock
+
+    mock.reset()
+    yield
+    mock.reset()
+
+
+@pytest.fixture(autouse=True)
+def no_real_network() -> Iterator[None]:
+    import respx
+
+    # The *global* router, not a fresh one: module-level ``respx.get(...)`` in a test registers
+    # there, and its ``assert_all_mocked`` default is what turns an unmocked host into a named
+    # failure instead of a five-second hang.
+    with respx.mock:
+        yield
+
+
+@pytest.fixture
+def live_settings(db_path: Path, clean_env: None) -> Settings:
+    """Live mode against two throwaway hosts, with a token respx can see on the wire."""
+    return Settings(
+        CADENCE_DB_PATH=db_path,
+        CADENCE_ENV="test",
+        CADENCE_VITALFORGE_MODE="live",
+        VITALFORGE_WEIGHT_URL="http://weight.test",
+        VITALFORGE_DASHBOARD_URL="http://dash.test",
+        VITALFORGE_TOKEN=VF_TOKEN,
+        VITALFORGE_PERSON_ME="jd",
+        VITALFORGE_PERSON_SON="kid",
+        OMNIROUTE_KEY="",
+        _env_file=None,
+    )
+
+
+@pytest.fixture
+def live_app(live_settings: Settings) -> FastAPI:
+    application = create_app(live_settings)
+    init_db(live_settings)
+    return application
+
+
+@pytest.fixture
+async def live_client(live_app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
+    transport = httpx.ASGITransport(app=live_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+@pytest.fixture
+def live_db(live_settings: Settings, live_app: FastAPI):
+    from sqlmodel import Session as DbSession
+
+    from cadence.db import get_engine
+
+    with DbSession(get_engine(live_settings)) as session:
+        yield session
+
+
+def complete_setup(db) -> None:
+    """Write the ``setting`` rows a finished Setup leaves behind.
+
+    PRP-03 gates every HTML screen on ``setup_complete`` (``cadence/web/gate.py``), so a database
+    without these rows answers ``/today`` and ``/done/...`` with a 303 to ``/setup``. ``merge``
+    rather than ``add``: a test that has already written one of these keys keeps its value.
+    """
+    from datetime import UTC, datetime
+
+    from cadence.profils.settings import DEFAULT_SETTINGS
+    from cadence.profils.tables import Setting
+
+    stamp = datetime.now(UTC).isoformat()
+    for key, value in DEFAULT_SETTINGS.with_changes(setup_complete=True).as_rows().items():
+        db.merge(Setting(key=key, value_json=value, updated_at=stamp))
+    db.commit()
+
+
+@pytest.fixture
+def vf_profiles(live_db):
+    """The two profiles with their VitalForge slugs, as ``make seed`` would leave them (D-017)."""
+    from cadence.profils.tables import Profile
+
+    me = Profile(id="me", display_name="Me", kind="adult", push_to_garmin=True, vitalforge_person="jd")
+    son = Profile(id="son", display_name="Son", kind="youth", vitalforge_person="kid")
+    live_db.add(me)
+    live_db.add(son)
+    live_db.commit()
+    complete_setup(live_db)
+    live_db.refresh(me)
+    live_db.refresh(son)
+    return {"me": me, "son": son}

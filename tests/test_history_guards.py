@@ -23,7 +23,7 @@ from cadence.historique.trend import BODY_FAT_RANGE, MIN_POINTS, TrendSeries, bo
 from cadence.profils.tables import PROFILE_ME, PROFILE_SON
 from cadence.vitalforge.tables import MetricsCache
 from tests.test_historique import ROW_COUNT, _plan, _profiles, _session
-from tests.test_history_api import SYNC_JOB_DDL, _finished
+from tests.test_history_api import DROP_SYNC_JOB, SYNC_JOB_DDL, _finished
 from tests.test_web_today import BARE_WORDS, BODY_IMAGE_PHRASES
 
 # The same scoping PRP-03's own check uses, widened by the classes History adds.
@@ -187,6 +187,7 @@ async def test_two_sync_rows_never_report_the_more_reassuring_one(
     """
     ids = _finished(history_db, PROFILE_ME, 1)
     with get_engine(settings).begin() as connection:
+        connection.execute(text(DROP_SYNC_JOB))
         connection.execute(text(SYNC_JOB_DDL.replace(" UNIQUE", "")))
         for job_id, status in (("job-a", "sent"), ("job-b", "failed")):
             connection.execute(
@@ -319,6 +320,7 @@ async def test_a_sync_status_nobody_recognises_reads_as_stored_locally(
     """PRP-06 may add a status this build has never heard of. It may not read as "Synced"."""
     ids = _finished(history_db, PROFILE_ME, 1)
     with get_engine(settings).begin() as connection:
+        connection.execute(text(DROP_SYNC_JOB))
         connection.execute(text(SYNC_JOB_DDL))
         connection.execute(
             text("INSERT INTO sync_job (id, session_id, target, status) VALUES (:i, :s, 'vitalforge', 'quantum')"),
@@ -342,6 +344,7 @@ async def test_each_sync_status_has_its_own_badge(
 ) -> None:
     ids = _finished(history_db, PROFILE_ME, 1)
     with get_engine(settings).begin() as connection:
+        connection.execute(text(DROP_SYNC_JOB))
         connection.execute(text(SYNC_JOB_DDL))
         connection.execute(
             text("INSERT INTO sync_job (id, session_id, target, status) VALUES (:i, :s, 'vitalforge', :st)"),

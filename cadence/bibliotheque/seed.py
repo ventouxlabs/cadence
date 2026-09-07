@@ -185,6 +185,14 @@ def _ensure_profiles(session: Session) -> list[Profile]:
             live.append(profile)
         else:
             existing.age_band = age_band(existing).value
+            # Backfill a blank slug from the environment on every run, never overwrite a set one.
+            # The two profiles are seeded before ``.env`` is filled in on a new install, so
+            # without this the person slugs stay empty for the life of the database and every
+            # write-back is skipped however correctly VITALFORGE_PERSON_* is set afterwards
+            # (D-138). A slug the user has chosen in Settings is theirs and is left alone.
+            wanted_slug = person_me if profile.id == PROFILE_ME else person_son
+            if not existing.vitalforge_person and wanted_slug:
+                existing.vitalforge_person = wanted_slug
             live.append(existing)
     return live
 

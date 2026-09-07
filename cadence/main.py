@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any
 
 from fastapi import APIRouter, Depends, FastAPI, Request
@@ -16,11 +17,14 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from cadence.api import health, profiles, sessions
 from cadence.api import history as api_history
+from cadence.api import metrics as api_metrics
 from cadence.api import settings as api_settings
+from cadence.api import sync as api_sync
 from cadence.api import today as api_today
 from cadence.api.envelope import err
 from cadence.config import Settings, get_settings
 from cadence.db import init_db
+from cadence.vitalforge.periodic import periodic_sync
 from cadence.web.gate import SetupRequired, require_setup, setup_redirect
 from cadence.web.rendering import STATIC_DIR
 from cadence.web.routers import history as web_history
@@ -36,6 +40,8 @@ ROUTERS: list[APIRouter] = [
     profiles.router,
     sessions.router,
     api_history.router,
+    api_metrics.router,
+    api_sync.router,
     web_settings.router,
     pwa.router,
 ]
@@ -69,7 +75,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = init_db(active)
         _refresh_bands(engine)
-        yield
+        # The one background task in the app (architecture section 1): no worker process, just a
+        # loop that drains the VitalForge queue and refreshes the metrics cache every five
+        # minutes. It sleeps before its first pass, so starting the app never costs a request.
+        #
+        # Off under ``CADENCE_ENV=test`` and under ``CADENCE_PERIODIC_SYNC=0``: a loop that wakes
+        # up mid-assertion writes to the same rows the test is reading, which is the difference
+        # between a suite that fails honestly and one that fails on Tuesdays (D-140).
+        if not active.periodic_sync_enabled:
+            logger.info("the periodic VitalForge sync is off (env=%s)", active.env)
+            yield
+            return
+        task = asyncio.create_task(periodic_sync(active))
+        try:
+            yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
     app = FastAPI(title="Cadence", version="0.1.0", lifespan=lifespan)
 

@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Today · Cadence{% endblock %}
 {% block content %}
+{% if nudge %}
+{# One line, from the metrics cache, on the parent's screens only. Never a network call: Today is
+   the hot path, and the son's profile never carries a body metric of any kind. #}
+<p class="nudge" id="readiness-nudge">{{ nudge }}</p>
+{% endif %}
 {% if view.missing %}
 <p class="notice">Nothing is planned for {{ view.missing|join(" and ") }} today.</p>
 {% endif %}

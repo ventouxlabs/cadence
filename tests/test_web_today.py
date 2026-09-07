@@ -108,7 +108,8 @@ async def test_done_page_shows_three_lines(seeded_client: httpx.AsyncClient) -> 
     assert "minute" in page.text
     assert f"1 of {len(data['rows'])} exercises" in page.text
     assert "Next time" in page.text
-    assert "Stored locally." in page.text
+    # PRP-06 replaced PRP-02's placeholder with the real write-back status.
+    assert "synced ✓" in page.text
 
 
 async def test_solo_render_detaches_a_together_session(seeded_client: httpx.AsyncClient) -> None:
@@ -240,3 +241,100 @@ async def test_youth_notes_never_use_the_bare_word_weight(seeded_client: httpx.A
                     assert not pattern.search(note.lower()), note
         await seeded_client.post(f"/api/sessions/{data['session_id']}/done", json={})
     assert checked, "the son's block carried no notes: the check would pass vacuously"
+
+
+# ------------------------------------------------------------------ PRP-06: the readiness nudge
+
+
+async def test_today_shows_the_readiness_nudge_from_the_cache(db_session, seeded_client) -> None:
+    """One line, for the parent, with no network call on the hot path."""
+    import json
+    from datetime import UTC, datetime
+
+    from cadence.vitalforge.tables import MetricsCache
+
+    db_session.add(
+        MetricsCache(
+            profile_id="me",
+            fetched_at=datetime.now(UTC).isoformat(),
+            payload_json=json.dumps({"latest": {}, "readiness": {"score": 72, "status": "ok"}}),
+        )
+    )
+    db_session.commit()
+
+    page = await seeded_client.get("/today?profile=me")
+
+    assert "Good day to push" in page.text
+
+
+async def test_the_son_never_sees_a_readiness_nudge(db_session, seeded_client) -> None:
+    """His readiness is permanently null (contract 2.3), and his profile carries no metric."""
+    import json
+    from datetime import UTC, datetime
+
+    from cadence.vitalforge.tables import MetricsCache
+
+    for profile_id, score in (("me", 72), ("son", None)):
+        db_session.add(
+            MetricsCache(
+                profile_id=profile_id,
+                fetched_at=datetime.now(UTC).isoformat(),
+                payload_json=json.dumps({"latest": {}, "readiness": {"score": score, "status": "ok"}}),
+            )
+        )
+    db_session.commit()
+
+    page = await seeded_client.get("/today?profile=son")
+
+    assert "readiness-nudge" not in page.text
+    assert "Good day to push" not in page.text
+
+
+async def test_the_nudge_switches_off_with_its_setting(db_session, seeded_client) -> None:
+    """``readiness_nudge_on`` already existed in settings; PRP-06 is what reads it."""
+    import json
+    from datetime import UTC, datetime
+
+    from cadence.profils.tables import Setting
+    from cadence.vitalforge.tables import MetricsCache
+
+    db_session.add(
+        MetricsCache(
+            profile_id="me",
+            fetched_at=datetime.now(UTC).isoformat(),
+            payload_json=json.dumps({"latest": {}, "readiness": {"score": 72, "status": "ok"}}),
+        )
+    )
+    setting = db_session.get(Setting, "readiness_nudge_on")
+    if setting is None:
+        db_session.add(Setting(key="readiness_nudge_on", value_json="false", updated_at="2026-09-06T00:00:00+00:00"))
+    else:
+        setting.value_json = "false"
+        db_session.add(setting)
+    db_session.commit()
+
+    page = await seeded_client.get("/today?profile=me")
+
+    assert "Good day to push" not in page.text
+
+
+async def test_the_together_tab_shows_no_readiness_nudge(db_session, seeded_client) -> None:
+    """D-135. Same reason D-105 keeps the body-composition card off this tab: the son reads it."""
+    import json
+    from datetime import UTC, datetime
+
+    from cadence.vitalforge.tables import MetricsCache
+
+    db_session.add(
+        MetricsCache(
+            profile_id="me",
+            fetched_at=datetime.now(UTC).isoformat(),
+            payload_json=json.dumps({"latest": {}, "readiness": {"score": 72, "status": "ok"}}),
+        )
+    )
+    db_session.commit()
+
+    page = await seeded_client.get("/today?profile=together")
+
+    assert "readiness-nudge" not in page.text
+    assert "Good day to push" not in page.text

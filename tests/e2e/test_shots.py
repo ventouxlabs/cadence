@@ -98,5 +98,5 @@ def test_shot_done(page: Page, fresh_session) -> None:
     page.wait_for_url("**/done/**")
 
     expect(page.locator(".summary-line")).to_have_count(3)
-    expect(page.locator("#sync-status")).to_have_text("Stored locally.")
+    expect(page.locator("#sync-status")).to_contain_text("synced")
     _shoot(page, "done-390.png")

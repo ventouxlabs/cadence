@@ -120,8 +120,8 @@ def test_the_felt_strip_appears_only_on_the_last_tick(page: Page, fresh_session)
         expect(page.locator(f'button.segment[value="{value}"]')).to_be_visible()
 
 
-def test_the_done_screen_says_the_session_is_stored_locally(page: Page, fresh_session) -> None:
-    """PRP-06 replaces this line with a real sync status; until then it must not promise one."""
+def test_the_done_screen_reports_the_write_back(page: Page, fresh_session) -> None:
+    """PRP-06's sync line. The server runs in mock mode, so the inline POST succeeds."""
     fresh_session("me")
     page.goto("/today?profile=me")
     _row(page, "me", 1).locator(".tick").check()
@@ -130,11 +130,11 @@ def test_the_done_screen_says_the_session_is_stored_locally(page: Page, fresh_se
     page.locator("button.done").click()
     page.wait_for_url("**/done/**")
 
-    expect(page.locator("#sync-status")).to_have_text("Stored locally.")
-    # Scoped to the summary: the base template's queue banner also says "will sync", and it is a
-    # statement about the phone's outbox rather than a promise about this session.
+    expect(page.locator("#sync-status")).to_contain_text("synced")
+    # Scoped to the summary. The line reports what the write-back actually did and nothing more:
+    # no spinner, no promise about Garmin, whose outcome VitalForge owns and Cadence never sees.
     summary = page.locator("section.summary").inner_text().lower()
-    for promise in ("will sync", "syncing", "uploaded", "garmin", "vitalforge"):
+    for promise in ("syncing", "uploaded", "garmin"):
         assert promise not in summary, f"the summary promised {promise!r}, which this build cannot do"
 
 

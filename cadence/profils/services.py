@@ -134,8 +134,22 @@ def update_settings(
     rebuilt: tuple[str, ...] = ()
     if changed & REBUILD_ON_SETTING:
         rebuilt = _rebuild_or_refuse(session, library, f"settings changed: {', '.join(sorted(changed))}")
+    if "push_son_to_garmin" in changed and not candidate.push_son_to_garmin:
+        # Switching the son's Garmin push off has to reach the queue, not just the next payload.
+        # A job queued while it was on carries ``push_to_garmin: true`` in its frozen body, so a
+        # session that timed out on Monday would still file itself under the parent's account on
+        # Wednesday — after the household had said no. Same transaction as the setting, so the
+        # answer and the queue can never disagree (D-139).
+        _withdraw_queued_youth_pushes(session)
     session.commit()
     return SettingsUpdate(settings=candidate, rebuilt=rebuilt)
+
+
+def _withdraw_queued_youth_pushes(session: Session) -> None:
+    """Cancel queued Garmin pushes for the son. Imported here to keep the dependency one-way."""
+    from cadence.vitalforge.writeback import cancel_youth_pushes
+
+    cancel_youth_pushes(session)
 
 
 def _build_message(exc: ProgramBuildError) -> str:

@@ -15,14 +15,15 @@ from datetime import UTC, datetime
 
 from sqlmodel import Session, select
 
+from cadence.config import Settings
 from cadence.programme import next_time_note
 from cadence.programme.tables import PlannedSession
 from cadence.seance.status import Completion, completion, rows_done
 from cadence.seance.tables import FELT_VALUES, SessionRecord
 from cadence.seance.today import SessionView, view_for_session
 
-# PRP-06 replaces this with the real sync status; until then a finished session is on this phone
-# and nowhere else, and the Done screen says so rather than promising a sync that cannot happen.
+# The status when no ``sync_job`` exists for a session: it is on this phone and nowhere else.
+# PRP-06 fills it from the job the write-back creates.
 SYNC_LOCAL = "local"
 
 PLANNED_DONE = "done"
@@ -107,8 +108,12 @@ def group_members(db: Session, record: SessionRecord) -> list[SessionRecord]:
     return members or [record]
 
 
-def summarise(view: SessionView) -> Summary:
-    """The summary of an already-finished session, computed from what is stored."""
+def summarise(view: SessionView, sync: str = SYNC_LOCAL) -> Summary:
+    """The summary of an already-finished session, computed from what is stored.
+
+    ``sync`` is the session's ``sync_job`` status when the caller has looked one up. The default
+    is the honest answer for a session nothing has queued: stored here, sent nowhere.
+    """
     return Summary(
         session_id=view.record.id,
         profile_id=view.profile.id,
@@ -119,6 +124,7 @@ def summarise(view: SessionView) -> Summary:
         completion=completion([row.record for row in view.rows], view.rules),
         felt=view.record.felt,
         next_time_note=next_time_note(view.record),
+        sync=sync,
     )
 
 
@@ -157,6 +163,7 @@ def finish(
     ts: str | None = None,
     *,
     group: bool = True,
+    config: Settings | None = None,
 ) -> list[Summary]:
     """Finalise this session, and its Together partner unless ``group`` says otherwise.
 
@@ -164,9 +171,19 @@ def finish(
     checklist and leaves the parent's open, which is the whole difference between a personal exit
     and the shared Done. Everything else keeps D-013's "one Done finalises both".
 
+    Then the VitalForge write-back (PRP-06): one ``sync_job`` per finished session, one inline
+    POST with a five-second timeout, and the summaries return whatever it managed. Failure is an
+    ordinary outcome here - the Done screen renders either way and the queue retries on its own
+    schedule. ``config`` is the environment settings; the routes pass theirs so a test's overrides
+    are honoured rather than the process-wide cache.
+
     Returns the summaries with this session's first, so the Done screen leads with the profile
     whose button was tapped.
     """
+    # Imported here, not at module scope: ``cadence.db`` imports ``cadence.seance.tables``, so a
+    # top-level import of the integration would close a loop through this package's ``__init__``.
+    from cadence.vitalforge.writeback import attempt_now, queue_session
+
     chosen = normalise_felt(felt)
     finished = _parse(ts) or datetime.now(UTC)
     members = group_members(db, view.record) if group else [view.record]
@@ -174,13 +191,30 @@ def finish(
         # ``felt`` is this session's answer, not the other person's: a shared Done finalises both
         # but nobody gets to say how someone else's session felt.
         _finalise_one(db, member, chosen if member.id == view.record.id else None, finished)
+    # The write-back job is written in *this* transaction, before the commit. Queuing after it
+    # would mean a crash in between leaves a finished session with nothing queued and nothing to
+    # notice it: the session reads as done, VitalForge never hears about it, and no screen says
+    # otherwise. "Finished" and "queued" are one fact or they are a silent hole.
+    queued = {member.id: queue_session(db, member, config=config) for member in members}
     db.commit()
+
+    # The POST comes after the commit: a five-second request has no business holding a database
+    # transaction open, and its failure is an ordinary outcome that must not undo the Done.
+    jobs = {}
+    for session_id, job in queued.items():
+        try:
+            attempted = attempt_now(db, job, config)
+        except Exception:  # noqa: BLE001 - Done renders whatever the integration managed
+            attempted = job
+        if attempted is not None:
+            jobs[session_id] = attempted
 
     summaries: list[Summary] = []
     for member in members:
         db.refresh(member)
         refreshed = view_for_session(db, member)
         if refreshed is not None:
-            summaries.append(summarise(refreshed))
+            job = jobs.get(member.id)
+            summaries.append(summarise(refreshed, job.status if job is not None else SYNC_LOCAL))
     summaries.sort(key=lambda item: item.session_id != view.record.id)
     return summaries

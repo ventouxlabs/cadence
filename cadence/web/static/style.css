@@ -303,7 +303,21 @@ body {
 .summary-card { margin: 0 auto 18px; max-width: 24rem; text-align: left; }
 .summary-who { font-size: 16px; color: var(--ink-soft); margin: 0 0 4px; }
 .summary-line { margin: 6px 0; font-size: 18px; }
+/* One line above the checklist, from the metrics cache. Quiet: it is a suggestion, not the
+   work, and it must never compete with the first row for the thumb or the eye. */
+.nudge {
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+/* The Done button's own progress line: hidden until HTMX marks the request in flight. */
+.saving { display: none; margin-left: 10px; color: var(--ink-soft); font-size: 0.9rem; }
+.htmx-request .saving, .saving.htmx-request { display: inline; }
+
 .sync { color: var(--ink-soft); }
+/* Why the Retry button did nothing. Its own line so it does not run into the status. */
+.sync-notice { display: block; margin-top: 4px; }
+.sync-retry { display: inline-block; margin-top: 8px; }
 .summary-actions { display: flex; gap: 10px; justify-content: center; margin-top: 24px; }
 
 .action {

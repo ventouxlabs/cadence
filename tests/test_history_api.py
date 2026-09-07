@@ -22,6 +22,8 @@ from cadence.profils.tables import PROFILE_ME, PROFILE_SON
 from cadence.vitalforge.tables import MetricsCache
 from tests.test_historique import ROW_COUNT, _plan, _profiles, _session
 
+DROP_SYNC_JOB = "DROP TABLE IF EXISTS sync_job"
+
 SYNC_JOB_DDL = """
 CREATE TABLE sync_job (
     id TEXT PRIMARY KEY,
@@ -117,9 +119,13 @@ async def test_history_without_the_metrics_cache_table(
     assert "No data yet." in page.text
 
 
-async def test_history_without_sync_job_table(history_db: DbSession, client: httpx.AsyncClient) -> None:
-    """PRP-06 owns ``sync_job``. Until it lands nothing may claim a session was synced."""
+async def test_history_without_sync_job_table(
+    history_db: DbSession, client: httpx.AsyncClient, settings: Settings
+) -> None:
+    """A database built before PRP-06 has no ``sync_job``. Nothing may claim a session was synced."""
     _finished(history_db, PROFILE_ME, 1)
+    with get_engine(settings).begin() as connection:
+        connection.execute(text(DROP_SYNC_JOB))
     page = await client.get("/history?profile=me")
 
     assert page.status_code == 200
@@ -136,6 +142,7 @@ async def test_sync_badge_reads_the_table_once_it_exists(
     """The badge is PRP-06's status when there is one, and this profile's own row only."""
     ids = _finished(history_db, PROFILE_ME, 2)
     with get_engine(settings).begin() as connection:
+        connection.execute(text(DROP_SYNC_JOB))
         connection.execute(text(SYNC_JOB_DDL))
         connection.execute(
             text("INSERT INTO sync_job (id, session_id, target, status) VALUES (:i, :s, 'vitalforge', 'sent')"),

@@ -12,7 +12,6 @@ import pytest
 
 from cadence.api.envelope import ENVELOPE_KEYS
 from cadence.programme.next_time import PLACEHOLDER_DEFAULT
-from cadence.seance.done import SYNC_LOCAL
 
 HX = {"HX-Request": "true"}
 
@@ -217,7 +216,9 @@ async def test_done_api_returns_the_summary(seeded_client: httpx.AsyncClient) ->
     payload = response.json()["data"]
     assert payload["completion"] == "complete"
     assert payload["rows_done"] == payload["rows_total"] == len(data["rows"])
-    assert payload["sync"] == SYNC_LOCAL
+    # PRP-06: the fixtures run in mock mode, so the inline write-back succeeds and the summary
+    # reports the job rather than the "nothing has queued this" default.
+    assert payload["sync"] == "sent"
     assert payload["next_time_note"]
     assert payload["felt"] == "right"
 
@@ -317,3 +318,58 @@ async def test_api_refuses_a_load_that_is_not_a_real_weight(aged_son_client: htt
     assert response.json()["error"]
     stored = (await aged_son_client.get("/api/today?profile=son")).json()["data"]
     assert next(item for item in stored["rows"] if item["position"] == row["position"])["load_done_kg"] is None
+
+
+# ------------------------------------------------- Codex E: the client clock is ordinary input
+
+
+async def test_a_naive_timestamp_is_refused(seeded_client: httpx.AsyncClient) -> None:
+    """The three plausible readings of a naive ts differ by hours, and guessing wrong misfiles a
+    Garmin activity by that much. A client that cannot say which zone it meant has not said one."""
+    data = await _today(seeded_client)
+    sid = data["session_id"]
+
+    response = await seeded_client.post(f"/api/sessions/{sid}/rows/1", json={"done": True, "ts": "2026-09-06T08:00:00"})
+
+    assert response.status_code == 422
+    assert response.json()["ok"] is False
+    assert "ts" in response.json()["error"]
+
+
+async def test_a_future_timestamp_is_refused_at_the_boundary(seeded_client: httpx.AsyncClient) -> None:
+    """Pairs with the payload clamp: a row already stored cannot be rejected retrospectively, so
+    the boundary refuses what it can and the payload builder clamps the rest."""
+    from datetime import UTC, datetime, timedelta
+
+    data = await _today(seeded_client)
+    sid = data["session_id"]
+    ahead = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+
+    row = await seeded_client.post(f"/api/sessions/{sid}/rows/1", json={"done": True, "ts": ahead})
+    done = await seeded_client.post(f"/api/sessions/{sid}/done", json={"ts": ahead})
+
+    assert row.status_code == 422
+    assert done.status_code == 422
+
+
+async def test_an_implausibly_old_timestamp_is_refused(seeded_client: httpx.AsyncClient) -> None:
+    data = await _today(seeded_client)
+
+    response = await seeded_client.post(
+        f"/api/sessions/{data['session_id']}/rows/1", json={"done": True, "ts": "1970-01-01T00:00:00+00:00"}
+    )
+
+    assert response.status_code == 422
+
+
+async def test_a_slightly_skewed_clock_is_still_accepted(seeded_client: httpx.AsyncClient) -> None:
+    """Sixty seconds of tolerance, the same as VitalForge's: a phone is not an atomic clock and a
+    tick taken a moment ago must not be refused for arriving a moment ahead."""
+    from datetime import UTC, datetime, timedelta
+
+    data = await _today(seeded_client)
+    ts = (datetime.now(UTC) + timedelta(seconds=30)).isoformat()
+
+    response = await seeded_client.post(f"/api/sessions/{data['session_id']}/rows/1", json={"done": True, "ts": ts})
+
+    assert response.status_code == 200

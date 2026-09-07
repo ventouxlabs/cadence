@@ -42,6 +42,9 @@ SYNC_LABELS: dict[str, tuple[str, str]] = {
     "pending": ("⟳", "Will sync"),
     "failed": ("!", "Sync failed"),
     "skipped": ("·", "Not sent"),
+    # PRP-06: a person switched the son's Garmin push off while this one was queued. Not a
+    # failure, and the badge must not read like one.
+    "cancelled": ("·", "Cancelled"),
     SYNC_LOCAL: ("·", "Stored locally"),
 }
 

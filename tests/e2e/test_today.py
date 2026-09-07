@@ -113,7 +113,7 @@ def test_done_shows_three_line_summary(page: Page, fresh_session) -> None:
     expect(lines.nth(0)).to_contain_text("minute")
     expect(lines.nth(1)).to_contain_text(f"of {len(data['rows'])} exercises")
     expect(lines.nth(2)).to_contain_text("Next time")
-    expect(page.locator("#sync-status")).to_have_text("Stored locally.")
+    expect(page.locator("#sync-status")).to_contain_text("synced")
 
 
 # ------------------------------------------------------------------------- 22: youth exit

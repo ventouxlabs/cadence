@@ -35,6 +35,8 @@ assert callable(_session)
 # Without the UNIQUE on ``session_id`` the test DDL in ``test_history_api`` carries, so a session
 # can hold the two attempts the badge has to choose between. Architecture section 3 calls
 # ``sync_job`` idempotent on ``session_id``, but the badge must not depend on that holding.
+DROP_SYNC_JOB = "DROP TABLE IF EXISTS sync_job"
+
 RETRYABLE_SYNC_JOB_DDL = """
 CREATE TABLE sync_job (
     id TEXT PRIMARY KEY,
@@ -401,6 +403,7 @@ async def test_the_sync_badge_is_the_newest_row_for_this_app(
     _profiles(db_session)
     stale_then_failed, other_target = _finished_pair(db_session)
     with get_engine(settings).begin() as connection:
+        connection.execute(text(DROP_SYNC_JOB))
         connection.execute(text(RETRYABLE_SYNC_JOB_DDL))
         for job_id, session_id, target, status in (
             ("a1", stale_then_failed, "vitalforge", "sent"),

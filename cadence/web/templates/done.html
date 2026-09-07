@@ -11,12 +11,12 @@
     <p class="summary-line">{{ item.next_time_note }}</p>
   </div>
   {% endfor %}
-  {# PRP-06 replaces both lines with the real sync status. Until then "stored" is only true once
-     the server has the session: a Done taken offline reaches this page from the queue first. #}
+  {# Two different queues, two deliberately different sentences. This one is the phone's own
+     outbox: a Done taken offline reaches this page before the server has the session at all. #}
   {% if pending %}
-  <p class="sync" id="sync-status">Saved on this phone — will sync.</p>
+  <p class="sync" id="sync-status" data-sync="queued">Saved on this phone — will sync.</p>
   {% else %}
-  <p class="sync" id="sync-status">Stored locally.</p>
+  {% include "partials/sync.html" %}
   {% endif %}
   <nav class="summary-actions">
     <a class="action" href="/today?profile={{ profile_key }}">Back to today</a>

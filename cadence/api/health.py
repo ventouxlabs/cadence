@@ -48,6 +48,11 @@ def health(
     payload = {
         "status": "ok" if db == "ok" else "degraded",
         "db": db,
+        # ``env`` and ``mode`` together, because "is this real" is one question with two
+        # halves: a prod deployment answering ``mode: mock`` would be reporting every session
+        # synced while sending nothing (D-139). Settings validation refuses that pairing at
+        # startup; this is how an operator sees it without reading the container's environment.
+        "env": settings.env,
         "vitalforge": {"configured": settings.vitalforge_configured, "mode": settings.vitalforge_mode},
         "version": app_version(),
     }

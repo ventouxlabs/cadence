@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlmodel import Session
 
+from cadence.config import Settings, get_settings
 from cadence.db import get_session
 from cadence.seance.catalog import display_unit, load_settings
 from cadence.seance.done import finish, group_members, is_finished, set_felt, summarise
@@ -26,6 +27,11 @@ from cadence.seance.today import (
     resolve_today,
     view_for_session,
 )
+from cadence.vitalforge.client import VitalForgeClient
+from cadence.vitalforge.metrics import read_cached
+from cadence.vitalforge.schedule import REFUSALS
+from cadence.vitalforge.sync import ForceRefused, drain
+from cadence.vitalforge.writeback import line_for_session
 from cadence.web.rendering import templates
 
 router = APIRouter(tags=["today"])
@@ -40,7 +46,9 @@ def _is_htmx(request: Request) -> bool:
     return request.headers.get("hx-request", "").lower() == "true"
 
 
-def _today_context(request: Request, view: TodayView, confirming: bool = False) -> dict[str, Any]:
+def _today_context(
+    request: Request, view: TodayView, confirming: bool = False, db: Session | None = None
+) -> dict[str, Any]:
     """Promotion is per session (``item.promoted``), never per page: see ``SessionView``."""
     return {
         "request": request,
@@ -49,7 +57,28 @@ def _today_context(request: Request, view: TodayView, confirming: bool = False) 
         "unit": display_unit(view.settings),
         "all_ticked": all(item.all_ticked for item in view.sessions),
         "confirming": confirming,
+        "nudge": readiness_nudge(db, view) if db is not None else None,
     }
+
+
+def readiness_nudge(db: Session, view: TodayView) -> str | None:
+    """One line from the cache, for the adult only, and **never** a network call.
+
+    Today is the hot path (``docs/architecture.md`` section 5): this reads the row the periodic
+    task wrote and nothing else. The youth profile has no readiness of its own - one Garmin
+    credential, one person - so showing him "not available" every day would be noise.
+
+    Off on the Together tab as well (D-135), for the same reason D-105 keeps the body-composition
+    card off it: that screen is the one the son is reading over his father's shoulder, and a
+    number about the parent's body has no business on it.
+    """
+    if not view.settings.readiness_nudge_on or view.together:
+        return None
+    adult = next((item.profile for item in view.sessions if item.profile.kind != "youth"), None)
+    if adult is None:
+        return None
+    cached = read_cached(db, adult)
+    return cached.readiness.nudge if cached is not None else None
 
 
 def _error_page(request: Request, message: str, status: int) -> HTMLResponse:
@@ -74,7 +103,7 @@ def today_page(
         view = resolve_today(db, profile)
     except TodayError as exc:
         return _error_page(request, str(exc), 404)
-    context = _today_context(request, view, confirming=confirm == "1")
+    context = _today_context(request, view, confirming=confirm == "1", db=db)
     return templates.TemplateResponse(request, "today.html", context)
 
 
@@ -224,6 +253,7 @@ def done_route(
     request: Request,
     session_id: str,
     db: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
     profile: Annotated[str | None, Query()] = None,
     confirm: Annotated[str | None, Form()] = None,
     felt: Annotated[str | None, Form()] = None,
@@ -242,7 +272,7 @@ def done_route(
             return RedirectResponse(f"/today?profile={profile_key}&confirm=1", status_code=SEE_OTHER)
         return _footer_only(request, db, profile_key, confirming=True)
 
-    finish(db, view, felt, group=not solo)
+    finish(db, view, felt, group=not solo, config=settings)
     return _to_done(request, session_id, profile_key)
 
 
@@ -276,6 +306,7 @@ def done_page(
     session_id: str,
     db: Annotated[Session, Depends(get_session)],
     profile: Annotated[str | None, Query()] = None,
+    notice: Annotated[str | None, Query()] = None,
 ) -> Response:
     record = db.get(SessionRecord, session_id)
     view = view_for_session(db, record) if record is not None else None
@@ -293,8 +324,56 @@ def done_page(
         "view": None,
         # A Done taken offline reaches this page from the queue before the server has the session.
         "pending": not is_finished(view.record),
+        # The server-side write-back, which is a different thing from the phone's own outbox.
+        # ``?notice=`` is how a refused plain-form Retry gets its reason across a redirect: a
+        # code looked up in a fixed table, never a sentence off the URL, so an unknown value
+        # renders nothing at all rather than whatever someone put there.
+        "sync": line_for_session(db, view.record.id).with_notice(REFUSALS.get(notice or "")),
+        "session_id": view.record.id,
     }
     return templates.TemplateResponse(request, "done.html", context)
+
+
+@router.post("/done/{session_id}/retry", response_class=HTMLResponse)
+async def retry_sync(
+    request: Request,
+    session_id: str,
+    db: Annotated[Session, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    profile: Annotated[str | None, Query()] = None,
+) -> Response:
+    """The Retry button. Drains this one job, ignoring the backoff, and re-renders the line.
+
+    A web route rather than ``POST /api/sync/retry`` for one reason: the button swaps HTML into
+    the page, and the JSON endpoint answers the envelope. Both call the same ``drain``, and this
+    one answers a plain form POST with a redirect so it works with JavaScript off.
+
+    An unknown session id is a 404, the same answer ``GET /done/{session_id}`` gives it. Draining
+    a queue that has never heard of the id and re-rendering "Stored locally." would tell a person
+    their session is safe on a device that does not have it.
+    """
+    if db.get(SessionRecord, session_id) is None:
+        return _error_page(request, f"no session {session_id!r}", 404)
+    profile_key = _safe_key(profile)
+    refusal: str | None = None
+    try:
+        await drain(db, VitalForgeClient(settings), force_session_id=session_id)
+    except ForceRefused as declined:
+        # The queue declined: this was tried a moment ago, or VitalForge rejected the session
+        # itself and would reject it again. Both are answers, not errors — the page re-renders
+        # with the reason rather than 500ing on a button somebody tapped twice.
+        refusal = declined.code
+    if _is_htmx(request):
+        return HTMLResponse(_sync_line(request, db, session_id, profile_key, refusal))
+    target = f"/done/{session_id}?profile={profile_key}"
+    return RedirectResponse(f"{target}&notice={refusal}" if refusal else target, status_code=SEE_OTHER)
+
+
+def _sync_line(request: Request, db: Session, session_id: str, profile_key: str, refusal: str | None = None) -> str:
+    line = line_for_session(db, session_id).with_notice(REFUSALS.get(refusal or ""))
+    return templates.get_template("partials/sync.html").render(
+        request=request, sync=line, session_id=session_id, profile_key=profile_key
+    )
 
 
 def _footer_only(request: Request, db: Session, profile_key: str, confirming: bool = False) -> Response:

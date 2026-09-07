@@ -1,0 +1,15 @@
+{# The server-side write-back to VitalForge. Static HTML: no spinner, no polling. The Retry
+   button appears where a person can change the outcome - the queue has given up, or there was
+   no token and they have just added one - and nowhere else, because every other state is
+   already going to try again by itself. #}
+<p class="sync" id="sync-status" data-sync="{{ sync.status }}">
+  {{ sync.text }}
+  {% if sync.notice %}<span class="sync-notice" data-role="sync-notice">{{ sync.notice }}</span>{% endif %}
+  {% if sync.retry %}
+  <form class="sync-retry" method="post" action="/done/{{ session_id }}/retry?profile={{ profile_key }}"
+        hx-post="/done/{{ session_id }}/retry?profile={{ profile_key }}"
+        hx-target="#sync-status" hx-swap="outerHTML">
+    <button class="action action-small" type="submit">Retry</button>
+  </form>
+  {% endif %}
+</p>

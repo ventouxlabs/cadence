@@ -19,14 +19,22 @@
   </fieldset>
   {% endif %}
   {% endfor %}
+  {# Done fires the VitalForge write-back inline, one attempt per session at a five-second
+     timeout, so a Together Done can take up to ten seconds against a slow VitalForge (D-134).
+     ``hx-disabled-elt`` disables the button for the duration and the indicator says why: a
+     button that looks untapped for ten seconds gets tapped again, and the second tap is a
+     second Done. Both are progressive enhancement - with HTMX off the form posts once and the
+     browser's own navigation is the feedback. #}
   <form method="post" action="/today/{{ view.primary.record.id }}/done?profile={{ profile_key }}"
         hx-post="/today/{{ view.primary.record.id }}/done?profile={{ profile_key }}"
-        hx-target="#done-footer" hx-swap="outerHTML" class="done-form">
+        hx-target="#done-footer" hx-swap="outerHTML" class="done-form"
+        hx-disabled-elt="find button" hx-indicator="#done-saving">
     <input type="hidden" name="confirm" value="{{ '1' if confirming or all_ticked else '0' }}">
     <button type="submit" class="done{% if view.primary.promoted %} done-promoted{% endif %}"
             data-session="{{ view.primary.record.id }}">
       {% if view.primary.promoted and view.primary.is_youth %}Good enough — done!{% else %}Done{% endif %}
     </button>
+    <span class="saving" id="done-saving" role="status" aria-live="polite">Saving…</span>
   </form>
   {% if confirming and not all_ticked %}
   <p class="hint">Tap Done again to finish with the rows you have.</p>

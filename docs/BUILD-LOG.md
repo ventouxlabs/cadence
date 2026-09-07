@@ -50,3 +50,10 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Reviewer: 2 Highs (orchestrator's D-099 made an 18 typo permanently strip youth rules — revised; silent rebuild skip when library missing) + 4 Mediums fixed; re-verify found the setup replay guard on the wrong route — orchestrator applied the 3-line fix + test.
 - Merged main (PRP-04) into the branch; exposed and fixed settings_from_rows discarding all keys on one bad value (D-115).
 - Final: 1527 passed, 77 e2e, 94% coverage. D-090..D-099, D-110..D-115. Squash-merged to main, tagged prp-03, pushed.
+
+## prp-06 — vitalforge-client — 2026-09-07 (worktree, parallel with 07/08)
+- Implementer built client, metrics, payload, sync, writeback, periodic, mock (1385 tests, 62 e2e); merged main (PRP-03).
+- Tester added 18 adversarial + 3 e2e (payload determinism, queue under load, three deployments); fixed 404 on unknown retry.
+- Reviewer: 2 Highs (fast clock → permanent 422; blank token/slug → silent permanent skip) + 4 Mediums; Codex (gpt-5.6-terra): 4 more Highs (token by value, mock in prod, retry re-resolving slug, youth push surviving opt-out) + 3 Mediums; all fixed; re-verify found one interaction High (SENT-with-schedule youth job escaping opt-out) fixed and confirmed by independent probe → APPROVE.
+- Final: 1739 passed, 84 e2e, 94% coverage; D-120..D-143.
+- Squash-merged to main, tagged prp-06, pushed.

@@ -17,6 +17,7 @@ import sys
 import time
 import uuid
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -39,11 +40,16 @@ def _free_port() -> int:
         return int(probe.getsockname()[1])
 
 
-@pytest.fixture(scope="session")
-def server_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A database seeded exactly the way ``make seed`` seeds the real one."""
-    path = tmp_path_factory.mktemp("e2e") / "cadence.db"
-    env = {**os.environ, "CADENCE_DB_PATH": str(path)}
+def _seed(path: Path, **env_overrides: str) -> Path:
+    """A database seeded exactly the way ``make seed`` seeds the real one.
+
+    ``env_overrides`` matters for more than the seeder's own settings: ``VITALFORGE_PERSON_ME``
+    and ``VITALFORGE_PERSON_SON`` are written onto the **profile rows** here (D-017, D-114), and
+    ``sync`` reads the slug off the profile rather than off the settings. A database seeded
+    without them makes every write-back ``skipped`` for a missing slug, whatever the server's
+    token says.
+    """
+    env = {**os.environ, "CADENCE_DB_PATH": str(path), **env_overrides}
     result = subprocess.run(
         [sys.executable, "-m", "cadence.bibliotheque.seed"],
         cwd=REPO,
@@ -57,14 +63,28 @@ def server_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return path
 
 
-@pytest.fixture(scope="session")
-def base_url(server_db: Path) -> Iterator[str]:
-    """The running app. ``page.goto('/today')`` resolves against this."""
+@contextmanager
+def serve(db: Path, log_name: str, **env_overrides: str) -> Iterator[str]:
+    """One uvicorn on a free port against ``db``, torn down on the way out.
+
+    Factored out of ``base_url`` so PRP-06 can run a second and a third app beside the mock-mode
+    one: the sync line the Done screen shows depends on the *deployment* - mocked, live against
+    something unreachable, live with no token - and that is an environment variable read at
+    startup, not something a test can change from inside the browser.
+    """
     port = _free_port()
-    env = {**os.environ, "CADENCE_DB_PATH": str(server_db), "CADENCE_VITALFORGE_MODE": "mock"}
+    # Periodic sync off by default (D-140): the five-minute loop would drain and refresh
+    # underneath a running test, and the trend card reads a ``metrics_cache`` row
+    # ``history_seed`` writes by hand. A deployment that wants the loop passes it back on.
+    env = {
+        **os.environ,
+        "CADENCE_DB_PATH": str(db),
+        "CADENCE_PERIODIC_SYNC": "0",
+        **env_overrides,
+    }
     # Straight to a file, never a pipe nobody reads: uvicorn's access log fills a 64 KB pipe
     # buffer partway through the suite and the server blocks on its own stdout forever.
-    log = server_db.parent / "uvicorn.log"
+    log = db.parent / log_name
     handle = log.open("w")
     process = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "cadence.main:app", "--host", "127.0.0.1", "--port", str(port)],
@@ -96,6 +116,78 @@ def base_url(server_db: Path) -> Iterator[str]:
             process.kill()
         finally:
             handle.close()
+
+
+@pytest.fixture(scope="session")
+def server_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return _seed(tmp_path_factory.mktemp("e2e") / "cadence.db")
+
+
+@pytest.fixture(scope="session")
+def base_url(server_db: Path) -> Iterator[str]:
+    """The running app. ``page.goto('/today')`` resolves against this."""
+    with serve(server_db, "uvicorn.log", CADENCE_VITALFORGE_MODE="mock") as url:
+        yield url
+
+
+# ``127.0.0.1:1`` is closed on every machine, so a POST there is refused immediately rather than
+# spending the client's five-second timeout. That is the "VitalForge is down" deployment.
+DEAD_HOST = "http://127.0.0.1:1"
+
+# Written onto the profile rows by the seeder, and frozen onto each job by ``sync.enqueue``.
+VF_PERSONS = {"VITALFORGE_PERSON_ME": "jd", "VITALFORGE_PERSON_SON": "kid"}
+
+
+@pytest.fixture(scope="session")
+def failing_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return _seed(tmp_path_factory.mktemp("e2e-failing") / "cadence.db", **VF_PERSONS)
+
+
+@pytest.fixture(scope="session")
+def failing_url(failing_db: Path) -> Iterator[str]:
+    """A live deployment whose VitalForge is unreachable.
+
+    Both a token and the person slugs are set. Without the slugs the client raises
+    ``VitalForgeNotConfigured`` before any socket is opened and the job lands ``skipped``, which
+    is the *other* screen entirely - "stored locally" rather than "sync failed (retrying)".
+    """
+    with serve(
+        failing_db,
+        "uvicorn-failing.log",
+        CADENCE_VITALFORGE_MODE="live",
+        VITALFORGE_WEIGHT_URL=DEAD_HOST,
+        VITALFORGE_DASHBOARD_URL=DEAD_HOST,
+        VITALFORGE_TOKEN="e2e-not-a-real-token",
+        VITALFORGE_PERSON_ME="jd",
+        VITALFORGE_PERSON_SON="kid",
+    ) as url:
+        yield url
+
+
+@pytest.fixture(scope="session")
+def tokenless_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Slugs and all: the only thing missing on this deployment must be the token."""
+    return _seed(tmp_path_factory.mktemp("e2e-tokenless") / "cadence.db", **VF_PERSONS)
+
+
+@pytest.fixture(scope="session")
+def tokenless_url(tokenless_db: Path) -> Iterator[str]:
+    """A live deployment with no token: the state a fresh install is in before JD pastes one.
+
+    The URLs still point at the dead host, so a client that decided to try anyway would fail
+    loudly here instead of reaching the real ``weight.grepon.cc`` default.
+    """
+    with serve(
+        tokenless_db,
+        "uvicorn-tokenless.log",
+        CADENCE_VITALFORGE_MODE="live",
+        VITALFORGE_WEIGHT_URL=DEAD_HOST,
+        VITALFORGE_DASHBOARD_URL=DEAD_HOST,
+        VITALFORGE_TOKEN="",
+        VITALFORGE_PERSON_ME="jd",
+        VITALFORGE_PERSON_SON="kid",
+    ) as url:
+        yield url
 
 
 @pytest.fixture(scope="session")
@@ -233,3 +325,15 @@ def history_seed(server_db: Path, base_url: str) -> dict[str, str]:
     finally:
         db.close()
     return {"session_id": session_id}
+
+
+@pytest.fixture(autouse=True)
+def no_real_network() -> Iterator[None]:
+    """Overrides the unit suite's respx guard, which has no business here.
+
+    ``tests/conftest.py`` blocks every real socket so an unmocked host cannot hang CI for the
+    client's five-second timeout. These tests are the opposite case: a real uvicorn on 127.0.0.1,
+    reached by a real browser. VitalForge is still never touched - the server runs in mock mode
+    (``base_url`` above), so the write-back answers itself in process.
+    """
+    yield

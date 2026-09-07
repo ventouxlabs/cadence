@@ -42,8 +42,12 @@ def test_history_renders_sessions(page: Page, history_seed: dict[str, str]) -> N
         expect(card.locator(".summary-line")).to_contain_text(re.compile(r"\d+ of \d+"))
         assert card.locator("a.hcard-tap").bounding_box()["height"] >= MIN_TAP_PX
 
-    # Nothing may claim a sync before PRP-06 exists.
-    expect(page.locator('[data-role="sync"]').first).to_contain_text("Stored locally")
+    # The badge is PRP-06's ``sync_job`` status. The seeded session went through the real Done,
+    # and the end-to-end server runs in mock mode, so its write-back succeeded; the two sessions
+    # written straight into the database never had a job and still say so.
+    badges = {page.locator('[data-role="sync"]').nth(index).inner_text() for index in range(EXTRA_SESSIONS + 1)}
+    assert any("Synced" in badge for badge in badges)
+    assert any("Stored locally" in badge for badge in badges)
 
 
 def test_scorecard_numbers(page: Page, history_seed: dict[str, str]) -> None:

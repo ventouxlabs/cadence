@@ -81,6 +81,12 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 - `GET /api/sessions`, `GET /api/scorecard`; `cadence/historique/` domain package with no web-layer imports; day labels in `cadence/schema/labels.py`.
 - 1277 tests, 58 Playwright, 94% coverage.
 
+### prp-06 — vitalforge-client (2026-09-07)
+- `cadence/vitalforge/` (nine modules): httpx client with separate weight/dashboard URLs and bearer auth (token redacted by value and shape everywhere), metrics cache refresh (adult: weight/body-fat/muscle/RHR/sleep/body battery + readiness; youth: readiness only, never body-comp; grams ÷ 1000; malformed responses never overwrite a good cache), readiness nudge on Today (adult), exact `ActivityIn` payload builder (timed rows as reps=1 + seconds, `garmin_category` omitted when null, clamped `start`, frozen `target_slug`).
+- Write-back on Done inside the finalisation transaction, one bounded inline attempt, then a leased retry queue (D-016 backoff, 8 attempts, 404/401 exempt, 409/422 terminal, `unknown` terminal, Garmin pending/failed after `sent` rescheduled, throttled manual Retry, periodic drain off under test, backfill of jobless sessions); youth pushes withdrawn when `push_son_to_garmin` turns off.
+- `GET /api/metrics`, `POST /api/sync/retry` (429 when throttled), `POST /done/{id}/retry`; Done status line with five states; `CADENCE_ENV` (prod refuses mock modes); `CADENCE_VITALFORGE_MODE=mock` for smoke tests.
+- 1739 tests, 84 Playwright, 94% coverage; end-to-end assertion of the exact `/api/activity` JSON for `me` and for `son` with the setting on and off.
+
 ### prp-05 — vitalforge-activity (2026-09-06) — branch `cadence/activity-endpoint` in ../vitalforge, not pushed
 - `POST /p/{slug}/api/activity` (202 fresh / 200 dedup / 409 cross-person / 422), `GET /p/{slug}/api/activity/{session_id}`, `GET /p/{slug}/api/strength-sessions`.
 - `strength_sessions` table with `UNIQUE(person_id, session_id)`; push claimed inside `BEGIN IMMEDIATE` (`garmin_claimed_at`, 600 s lease); statuses pending/synced/failed/skipped/unknown; reconciliation by lookup for ambiguous outcomes; session marker in the Garmin activity name.
@@ -95,3 +101,14 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
   fail-closed per-band exercise allowlist), `GET /api/health`, the JSON
   envelope, `library/youth_rules.yaml` for all four age bands, Makefile, pre-commit config and
   GitHub Actions CI. Decisions D-028 to D-034.
+
+### prp-06 — VitalForge client (2026-09-06)
+- `cadence/vitalforge/`: `client.py` (httpx, separate weight `:8085` and dashboard `:8086` base URLs, bearer header built at one point, 5 s timeout, typed `ActivityResult`), `errors.py` (no `httpx` exception escapes the package; every message and body sanitised of `Bearer …` and truncated to 500 chars), `metrics.py`, `payload.py`, `sync.py`, `writeback.py`, `periodic.py`, `mock.py`.
+- `sync_job` table with a unique `session_id`; `enqueue` is get-or-create, so the offline queue's replay of Done cannot file a session twice.
+- Write-back on Done: one `sync_job`, one inline POST at the 5 s timeout, redirect never blocked. Bounded retry per D-016 — 1 min → 2 h, 8 attempts; **409 and 422 terminal**; a 404 names the `cadence/activity-endpoint` branch and a 401 says the token was rejected, neither burning an attempt; VitalForge's `unknown` Garmin status is terminal with a warning.
+- Metrics cache filled per D-101 and D-120: `weight` and `muscle_mass` divided by 1000 (contract §2.2), `body_fat` untouched, 6 h staleness evaluated on read, a partial failure keeping whatever came back and a total failure keeping the last good payload. The youth profile fetches **readiness only** and its body-composition keys are absent, not null.
+- Readiness nudge: "Good day to push" / "Steady day" / "Easy day — hold loads" / "Readiness not available"; a `null` score is never coerced to zero (the son's is permanently null).
+- `GET /api/metrics?profile=` (cache only, zero network calls) and `POST /api/sync/retry`, both on the standard envelope; a 5-minute lifespan task drains the queue and refreshes the cache, sleeping first and cancelling cleanly.
+- Done screen shows all five sync states, with a Retry button only on the terminal one, kept verbally distinct from PRP-02's offline banner. One-line readiness nudge on Today for the adult profile, from the cache.
+- `CADENCE_VITALFORGE_MODE=mock` runs the whole path in process against a fake that records payloads, for PRP-09's deploy smoke test.
+- Tests: 108 new (`test_vitalforge_client` 12, `test_metrics` 20, `test_payload` 20, `test_sync` 25, `test_metrics_api` 6, `test_done_sync_line` 10, `test_session_to_activity` 11, plus 4 readiness-nudge cases in `test_web_today`) and 4 Playwright. The brief's finish criterion — one full session through Done asserting the **exact** `/api/activity` JSON — is asserted with `==` for `me` and for `son` with the setting on and off. Together mode files two activities, one per person slug, with the son's `garmin_target` riding on the setting alone. The cached payload is read back through PRP-04's own trend reader, so the D-101 seam is crossed rather than described. Suite-wide respx guard proves no unmocked host is ever reached.
