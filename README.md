@@ -1,4 +1,22 @@
-# Cadence
+<!-- glowup:hero start -->
+<div align="center">
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner.svg">
+    <img src="docs/assets/banner-light.svg" alt="Cadence" width="880">
+  </picture>
+</h1>
+
+[![Build](https://img.shields.io/github/actions/workflow/status/ventouxlabs/cadence/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=build)](https://github.com/ventouxlabs/cadence/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/ventouxlabs/cadence?style=for-the-badge)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![HTMX](https://img.shields.io/badge/HTMX-3366CC?style=for-the-badge&logo=htmx&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![PWA](https://img.shields.io/badge/PWA-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)
+
+</div>
+<!-- glowup:hero end -->
 
 A very simple daily workout app for a parent and a kid.
 
