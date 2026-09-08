@@ -2,8 +2,11 @@
 
 The **youth guard lives here**, not in a template: the column is built with ``trend=None`` for any
 ``profile.kind == "youth"`` before the template is reached, so a template bug cannot leak a body
-metric onto the son's screen (PRP-04 risk 5). The serialiser drops the ``trend`` key entirely for
-the same profiles — absent, never null.
+metric onto the son's screen (PRP-04 risk 5). PRP-10's badge gate works the same way but lives
+one level down, in ``historique.badges.badges_for``: badges are asked for by three surfaces, not
+just this column, so the filter belongs with the rules rather than with one of their readers
+(D-256). The serialiser drops the ``trend`` key entirely for the same profiles — absent, never
+null.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from typing import Any
 
 from sqlmodel import Session
 
+from cadence.historique.badges import Badge, badges_for
 from cadence.historique.queries import DEFAULT_LIMIT, SessionSummary, clamp_limit, recent_sessions
 from cadence.historique.scorecard import Scorecard, weekly_scorecard
 from cadence.historique.sparkline import sparkline
@@ -33,6 +37,9 @@ class HistoryColumn:
     sessions: tuple[SessionSummary, ...]
     trend: TrendSeries | None
     svg: str | None
+    # Derived on every read, stored nowhere (PRP-10). Deliberately absent from ``as_dict``:
+    # that payload is ``GET /api/scorecard``'s contract and PRP-04's tests pin its keys.
+    badges: tuple[Badge, ...] = ()
 
     @property
     def is_youth(self) -> bool:
@@ -84,6 +91,10 @@ def build_column(
         sessions=tuple(recent_sessions(db, profile.id, limit)),
         trend=trend,
         svg=sparkline(trend),
+        # No filter here: ``badges_for`` drops an unsafe rule for a youth profile before it
+        # builds anything, so every caller inherits the gate rather than each one repeating it
+        # (D-256). A second copy here would be a second thing to keep in step.
+        badges=tuple(badges_for(db, profile.id)),
     )
 
 

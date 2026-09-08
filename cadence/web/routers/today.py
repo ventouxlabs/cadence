@@ -16,6 +16,9 @@ from sqlmodel import Session
 from cadence.bilan.service import card_due, ensure_retest_queued
 from cadence.config import Settings, get_settings
 from cadence.db import get_session
+from cadence.historique.badges import badges_earned_on
+from cadence.historique.clock import local_date
+from cadence.profils.tables import Profile
 from cadence.seance.catalog import display_unit, library_bundle, load_settings
 from cadence.seance.done import finish, group_members, is_finished, set_felt, summarise
 from cadence.seance.tables import SessionRecord
@@ -33,7 +36,7 @@ from cadence.vitalforge.metrics import read_cached
 from cadence.vitalforge.schedule import REFUSALS
 from cadence.vitalforge.sync import ForceRefused, drain
 from cadence.vitalforge.writeback import line_for_session
-from cadence.web.rendering import templates
+from cadence.web.rendering import is_youth, templates
 
 router = APIRouter(tags=["today"])
 
@@ -335,9 +338,16 @@ def done_page(
     members = [item for item in group_members(db, view.record) if is_finished(item)] or [view.record]
     summaries = [summarise(item) for item in (view_for_session(db, m) for m in members) if item is not None]
     summaries.sort(key=lambda item: item.session_id != view.record.id)
+    finished_members = [item for item in members if item.finished_at is not None]
     context = {
         "request": request,
         "summaries": summaries,
+        # Son mode on Done. Both are per session rather than per page, because a Together Done
+        # summarises two people and only one of them reads "things done" (D-247).
+        "youth_sessions": {item.id for item in members if is_youth(db.get(Profile, item.profile_id))},
+        "new_badges": {
+            item.id: badges_earned_on(db, item.profile_id, local_date(item.finished_at)) for item in finished_members
+        },
         "profile_key": _safe_key(profile),
         "view": None,
         # A Done taken offline reaches this page from the queue before the server has the session.

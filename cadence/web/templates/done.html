@@ -2,13 +2,25 @@
 {% block title %}Done · Cadence{% endblock %}
 {% block content %}
 <section class="summary">
-  <h1 class="summary-head">Done. <span aria-hidden="true">&#10003;</span></h1>
+  {# "Nice one." on the son's own Done, "Done." everywhere else. The scope that sizes this page
+     is `data-profile-kind` on the body, which `base.html` sets from `profile_key` (D-234). #}
+  <h1 class="summary-head">{% if profile_key == "son" %}Nice one.{% else %}Done.{% endif %} <span aria-hidden="true">&#10003;</span></h1>
   {% for item in summaries %}
-  <div class="summary-card">
+  {# The son's card carries the scope itself. `base.html` keys the body on `profile_key == "son"`,
+     which is right for his own Done and inert on the shared one — Together renders both people in
+     one document, so the type scale has to travel with the card, exactly as D-234 puts it on his
+     <section> on Today rather than on the body. #}
+  <div class="summary-card"{% if item.session_id in youth_sessions %} data-profile-kind="youth"{% endif %}>
     {% if summaries|length > 1 %}<h2 class="summary-who">{{ item.display_name }}</h2>{% endif %}
-    <p class="summary-line">{{ item.duration_min }} minute{{ '' if item.duration_min == 1 else 's' }}</p>
-    <p class="summary-line">{{ item.rows_done }} of {{ item.rows_total }} exercises</p>
+    <p class="summary-line" data-role="duration">{{ item.duration_min }} minute{{ '' if item.duration_min == 1 else 's' }}</p>
+    <p class="summary-line" data-role="rows">{{ item.rows_done }} of {{ item.rows_total }}
+      {%- if item.session_id in youth_sessions %} things done{% else %} exercises{% endif %}</p>
     <p class="summary-line">{{ item.next_time_note }}</p>
+    {# Derived, never stored: a badge whose earned-on day is this session's day was earned by it
+       (D-247). Nothing is written, so re-opening this page shows the same line. #}
+    {% for badge in new_badges.get(item.session_id, []) %}
+    <p class="summary-badge" data-role="new-badge"><span aria-hidden="true">&#127941;</span> New badge: {{ badge.name }}</p>
+    {% endfor %}
   </div>
   {% endfor %}
   {# Two different queues, two deliberately different sentences. This one is the phone's own

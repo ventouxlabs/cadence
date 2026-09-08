@@ -16,6 +16,12 @@
            aria-checked="{{ 'true' if row.record.done else 'false' }}"
            aria-label="{{ row.spec.name }}, {{ prescription(row, unit) }}">
     <span class="row-body">
+      {% set symbol = icon_id(row.record.exercise_id) if view.is_youth else none %}
+      {% if symbol %}
+      {# Explicit width and height: an SVG without them has no intrinsic size and shifts the row
+         as it paints, which is the layout shift `make perf` forbids. #}
+      <svg class="row-icon" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#{{ symbol }}"></use></svg>
+      {% endif %}
       <span class="row-name">{{ row.spec.name }}</span>
       <span class="row-line">{{ prescription(row, unit) }}</span>
       {% if row.spec.cue %}<span class="row-cue">{{ row.spec.cue }}</span>{% endif %}

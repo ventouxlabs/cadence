@@ -167,3 +167,48 @@ body { padding-bottom: 24px; }
 @media (min-width: 700px) {
   .columns-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 }
+
+/* ---------------------------------------------------------------- badges (PRP-10)
+   Earned tiles are filled, unearned outlined. Tapping one swaps the caption line and nothing
+   else — the strip itself never re-renders, so the row a thumb is on cannot move under it. */
+.badge-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.badge {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.badge-on {
+  border-color: var(--go);
+  background: var(--go);
+  color: var(--go-ink);
+  font-weight: 700;
+}
+
+.badge-mark { font-size: 15px; line-height: 1; min-height: 15px; }
+.badge-short { line-height: 1; }
+
+.badge-caption { margin: 0; color: var(--ink-soft); font-size: 15px; min-height: 20px; }
+
+[data-profile-kind="youth"] .badge { width: 60px; height: 60px; font-size: 14px; }
+[data-profile-kind="youth"] .badge-caption { font-size: 16px; }

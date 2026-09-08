@@ -182,7 +182,7 @@ def _statement(with_sync: bool, where: str, tail: str = "") -> str:
     return _LIST_SQL.format(sync_select=_SYNC_SELECT if with_sync else "", where=where, tail=tail)
 
 
-def _threshold(db: Session, profile_id: str) -> int:
+def completion_threshold(db: Session, profile_id: str) -> int:
     """The band threshold ``completion`` is judged against, for a profile that may be missing."""
     profile = db.get(Profile, profile_id)
     return good_enough_after(band_rules(profile)) if profile is not None else 1
@@ -195,7 +195,7 @@ def recent_sessions(db: Session, profile_id: str, limit: int = DEFAULT_LIMIT) ->
     workout is one row on each list rather than two on either (PRP-04 risk 10).
     """
     size = clamp_limit(limit)
-    threshold = _threshold(db, profile_id)
+    threshold = completion_threshold(db, profile_id)
     with_sync = has_table(db, "sync_job")
     statement = _statement(with_sync, _BY_PROFILE, "LIMIT :limit")
     rows = db.execute(text(statement), {"profile_id": profile_id, "limit": size}).all()
@@ -208,7 +208,7 @@ def session_summary(db: Session, session_id: str) -> SessionSummary | None:
     row = db.execute(text(_statement(with_sync, _BY_ID)), {"session_id": session_id}).first()
     if row is None:
         return None
-    return _summary(row._mapping, _threshold(db, str(row._mapping["profile_id"])), with_sync)
+    return _summary(row._mapping, completion_threshold(db, str(row._mapping["profile_id"])), with_sync)
 
 
 def _summary(row: dict, threshold: int, with_sync: bool) -> SessionSummary:

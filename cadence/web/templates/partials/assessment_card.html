@@ -1,6 +1,10 @@
 {# Today's Assessment-day card (PRP-07). Shown while the profile has no battery, and again when
    the newest one turns 28 days old. `Skip` marks the queued assessment day skipped and moves on;
-   the card comes back with the next session until a baseline is actually recorded. #}
+   the card comes back with the next session until a baseline is actually recorded.
+
+   The son's copy of that control says "Not today" (D-246). "Skip" is failure framing, which
+   PRP-10's son-mode copy rules ban outright, and this card renders on his Today like any other.
+   The behaviour is identical; only the word changes. #}
 <section class="assess-card" data-role="assessment-card" aria-labelledby="assess-card-head">
   <h2 class="assess-card-head" id="assess-card-head">Assessment day</h2>
   <p class="assess-card-line">Six tests, about 15 minutes.</p>
@@ -8,7 +12,7 @@
     <a class="action" href="/assess?profile={{ view.primary.profile.id }}">Start</a>
     <form method="post" action="/assess/skip?profile={{ view.primary.profile.id }}">
       <input type="hidden" name="tab" value="{{ profile_key }}">
-      <button class="action action-quiet" type="submit">Skip</button>
+      <button class="action action-quiet" type="submit">{% if view.primary.is_youth %}Not today{% else %}Skip{% endif %}</button>
     </form>
   </div>
 </section>

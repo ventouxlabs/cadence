@@ -2,7 +2,7 @@
 CADENCE_HOST ?= 0.0.0.0
 CADENCE_PORT ?= 8090
 
-.PHONY: dev test lint fmt seed seed-fresh e2e deploy dev-docker smoke backup
+.PHONY: dev test lint fmt seed seed-fresh e2e deploy dev-docker smoke backup perf screenshots
 
 dev:  ## Run the app with reload on $(CADENCE_HOST):$(CADENCE_PORT)
 	uv run uvicorn cadence.main:app --reload --host $(CADENCE_HOST) --port $(CADENCE_PORT)
@@ -51,6 +51,12 @@ dev-docker:  ## Build and run the container locally on $(CADENCE_PORT) with podm
 
 smoke:  ## Run the smoke test against a running instance (make smoke BASE=https://cadence.grepon.cc)
 	BASE=$(BASE) ./scripts/smoke.sh
+
+perf:  ## Fail if /today breaks the D-025 page-weight budget (make perf BASE=https://cadence.grepon.cc)
+	uv run python scripts/perf.py $(BASE)
+
+screenshots:  ## Write docs/screenshots/ from a throwaway seeded database
+	uv run python scripts/screenshots.py
 
 backup:  ## Snapshot data/cadence.db into data/backups/, keeping the newest 30
 	./scripts/backup.sh

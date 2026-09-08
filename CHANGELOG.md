@@ -4,6 +4,26 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 
 ## [Unreleased]
 
+### prp-10 — polish (2026-09-07)
+- Son-mode UX pass on Today, Done and History (bigger type, "Not today" instead of failure-framed copy, a derived new-badge line, ≤300ms tick animation respecting `prefers-reduced-motion`); a real `youth_safe` filter on badges (not just a comment).
+- Seven computed badges (never stored): first session, 3/7-streak, 10/25 sessions, 4-week prelude, challenge met.
+- `make perf` (D-025 page-weight gate, enforced in CI via `tests/test_perf.py`) and `make screenshots` (seven PNGs in `docs/screenshots/`).
+- `docs/HANDOFF.md`: what shipped, what was descoped, open decisions, the VitalForge branch to review, exact VM-201 deploy commands, day-one checklist, and a PWA-install section.
+- 3241 tests, 129 Playwright, 92% coverage.
+
+
+### prp-10 — son mode, badges, performance, screenshots, handoff (2026-09-07)
+- Son-mode UX pass on Today, Done and History as a single CSS scope (`[data-profile-kind="youth"]`): type up one step, 64 px rows, an inline-SVG icon per movement pattern drawn from one reused `<symbol>` sprite, a 200 ms check animation on `transform`/`opacity` only, and a filled 72 px "Good enough — done!" once the band threshold is met.
+- `cadence/historique/badges.py`: seven badges (first session, three and seven in a row, ten and twenty-five sessions, four weeks of preludes, challenge met), computed on every read and stored nowhere. Streaks and "complete" come from PRP-04's modules rather than being re-derived; `scorecard.streak_milestones` folds the same walk `current_streak` does, once for every streak length asked about.
+- Badge strip on History with a caption that swaps in place and never navigates (`GET /history/badges/{profile}/{badge}`). Youth profiles see the playful names.
+- `make perf` (`scripts/perf.py`): gzip transfer bytes for `/today` on both profiles against D-025's budgets, plus assertions that the response is compressed, that no external host is referenced and that no webfont or preconnect exists. Importable, so the negative case is a test rather than a subprocess.
+- `make screenshots` (`scripts/screenshots.py`): seven PNGs into `docs/screenshots/` from throwaway seeded databases, with motion off and the metrics cache fixed; refuses to run against the real database. CI uploads the directory as an artifact.
+- `docs/HANDOFF.md`: what shipped per PRP, what was descoped, the decisions left open, the VitalForge branch to review with its live-probe checklist, the VM-201 deploy commands, a day-one checklist, and an "Installing as an app" section covering the PWA and optional TWA paths (D-117).
+- `README.md` rewritten: quick start, the settings table, the Makefile targets, and a link to the handoff.
+- Son-mode Done: `done.html` shares no selector with the checklist, so the youth scope gained its own four, plus a derived "New badge" line naming whatever this session earned.
+- Copy: the son's assessment-card control says "Not today" and the skip link says "Jump to today"; the banned-word guard matches word-boundary stems, not substrings, which is what let `Skip` through.
+- Decisions D-230..D-255.
+
 ### prp-09 — deploy: image, compose, backups, runbook (2026-09-07)
 - `Dockerfile`: two stages on `python:3.12-slim`, uv pinned at `ghcr.io/astral-sh/uv:0.11`, `uv sync --frozen --no-dev`, non-root uid 10001, `/app/data` volume, `CADENCE_ENV=prod` in the image, and a `HEALTHCHECK` that parses `ok` rather than trusting a 200 — `/api/health` answers 200 with `ok: false` when the database check fails.
 - One uvicorn worker, no `--reload`: a second worker would run its own copy of PRP-06's sync drain and double-POST every session to VitalForge and Garmin.

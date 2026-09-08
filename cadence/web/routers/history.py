@@ -8,6 +8,7 @@ every other screen on this app.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -15,6 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlmodel import Session
 
 from cadence.db import get_session
+from cadence.historique.badges import badge_by_id, badges_for
 from cadence.historique.detail import session_detail
 from cadence.historique.page import HistoryView, build_page, resolve_profiles
 from cadence.historique.queries import DEFAULT_LIMIT, session_summary
@@ -101,5 +103,48 @@ def history_card(
         detail=session_detail(db, session_id) if expanded else None,
         expanded=expanded,
         unit=display_unit(load_settings(db)),
+    )
+    return HTMLResponse(body)
+
+
+@router.get("/history/badges/{profile_id}/{badge_id}", response_class=HTMLResponse)
+def badge_caption(
+    request: Request,
+    profile_id: str,
+    badge_id: str,
+    db: Annotated[Session, Depends(get_session)],
+    profile: Annotated[str | None, Query()] = None,
+) -> Response:
+    """The caption for one badge. Swaps the line under the strip and never navigates.
+
+    A route rather than JavaScript because History is not in the offline cache, so the round trip
+    costs nothing the page has not already paid, and the names are computed server-side anyway —
+    a youth profile reads a different word for the same badge.
+
+    A caption can only be read on a tab that owns the profile, the same rule ``history_card``
+    applies to a session card and for the same reason: Together carries both people, but
+    ``?profile=son`` may not read the parent's strip. The refusal is the 404 an unknown badge id
+    gets, so the reply says nothing about whose profile it was.
+
+    The tab is read from ``?profile=`` **only**, never from the path (D-249): an earlier cut fell
+    back to ``profile_id`` when the query was absent, which made the check answer its own
+    question — every request without a query string resolved the tab from the very profile it was
+    meant to be authorising, and so always passed. An omitted query is the parent's tab, which is
+    what ``normalise_profile_key`` already defaults to everywhere else.
+    """
+    try:
+        _, profiles = resolve_profiles(db, profile)
+    except TodayError:
+        return _error_page(request, f"no badge {badge_id!r}", 404)
+    owner = next((item for item in profiles if item.id == profile_id), None)
+    if owner is None:
+        return _error_page(request, f"no badge {badge_id!r}", 404)
+    badge = badge_by_id(badges_for(db, profile_id), badge_id)
+    if badge is None:
+        return _error_page(request, f"no badge {badge_id!r}", 404)
+    body = templates.get_template("partials/badge_caption.html").render(
+        request=request,
+        column=SimpleNamespace(profile=owner),
+        caption=badge.caption,
     )
     return HTMLResponse(body)

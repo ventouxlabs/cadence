@@ -13,8 +13,14 @@
 <script src="/static/htmx.min.js" defer></script>
 <script src="/static/app.js" defer></script>
 </head>
-<body>
-<a class="skip" href="#main">Skip to today</a>
+{# Son mode is a CSS scope, not a second template tree (PRP-10 risk 1). The body carries the
+   kind only on a solo tab: on Together the parent and the son share one document, so the scope
+   moves to each section instead and the body stays neutral (D-234). #}
+<body{% if profile_key == "son" %} data-profile-kind="youth"{% endif %}>
+{# "Jump", not "Skip" (D-246): this renders on the son's screens too, and the son-mode copy rules
+   ban failure framing. "Jump to <destination>" is as conventional a skip-link label as the other
+   and says the same thing, so the change costs no accessibility and needs no youth branch. #}
+<a class="skip" href="#main">Jump to today</a>
 {% set tab_base = tab_base|default("/today") %}
 {% set tab_profile = profile_key|default("me") %}
 <header class="topbar">

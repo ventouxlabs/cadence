@@ -78,3 +78,22 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Merged main (PRP-08/09): resolved a decision-number range collision (renumbered D-190..D-207 to D-210..D-227) and fixed 4 tests whose hand-rolled `challenge` fixtures predated PRP-07's real table.
 - Final: 3163 passed, 100 e2e, 92% coverage, lint clean.
 - Squash-merged to main, tagged prp-07, pushed. All eleven PRPs now merged.
+
+## PRP-10 — Son mode, badges, performance, screenshots, handoff (tag `prp-10`)
+
+- Son-mode UX pass as one CSS scope (`[data-profile-kind="youth"]`), no second template tree: type up one step, 64 px rows, an inline-SVG icon per movement pattern from one reused `<symbol>` sprite, a 200 ms check animation that shifts no layout, and a promoted "Good enough — done!" at 72 px.
+- Seven badges in `cadence/historique/badges.py`, derived on every read and stored nowhere; streaks and "complete" are imported from PRP-04 rather than restated, and the strip renders into PRP-04's `#badges` container with a caption route that never navigates.
+- `make perf`: `scripts/perf.py` measures gzip transfer bytes for `/today` on both profiles against D-025's budgets, asserts `Content-Encoding: gzip`, no external host and no webfont, and is importable so a test can prove the gate fires without the middleware.
+- `make screenshots`: seven PNGs into `docs/screenshots/` from two throwaway seeded databases, motion forced off and the metrics cache fixed; it refuses to run against `data/cadence.db`. CI uploads the directory as an artifact.
+- Late review fixes: `youth_safe` became a real per-rule field filtered on in `build_column`, so the youth badge guard is enforced rather than true by accident (D-254), and the Together Done screen carries the youth scope on the son's summary card so his half is not rendered at the adult scale (D-255).
+- Review fixes: the son's Done screen got the son-mode pass it had been claimed to have and a derived "New badge" line (D-247); "Skip" became "Not today" and the guard that missed it now matches stems on a word boundary (D-246); the badge-caption guard no longer resolves its tab from the path it is authorising (D-249); screenshots are viewport captures so the fixed footer stops painting over a row (D-250), and `tests/test_screenshots.py` pins the seven names and dimensions since a byte diff cannot survive two machines (D-251); HANDOFF quotes the real branch base (D-252) and names the two badge edges (D-231, D-232, D-248).
+- Pre-merge fixes: the badge-caption route gained the ownership check its sibling route already had (D-243), the icon lookup was scoped to youth rows so the parent's hot path pays nothing (D-244), and the end-to-end banned-word list imports the shared one instead of forking it (D-245).
+- `docs/HANDOFF.md` (nine sections plus "Installing as an app" for D-117's PWA and TWA paths) and a rewritten `README.md`. D-230..D-242 record the departures.
+
+## prp-10 — polish — 2026-09-07 (final PRP)
+- Implementer built badges, son-mode UX pass, perf/screenshot scripts, HANDOFF.md (3193 tests, 111 e2e).
+- Reviewer: 2 Highs (a "Skip" button reached the son's screen past a mis-calibrated word-list guard; the son's Done screen got no youth pass despite the changelog claiming it did) + 6 Mediums + 4 Lows fixed and re-verified APPROVE.
+- Tester added ~46 tests, caught two vacuous e2e tests (empty-string parse, mid-swap computed style), fixed a real HANDOFF/screenshot test file duplication.
+- Orchestrator pushed back once more: a hardcoded `youth_safe=True` with an explanatory comment was replaced with a real per-rule filter and a test proving an unsafe rule is actually excluded, matching the project's standing rule that "safe by accident" always gets an enforced gate.
+- Final: 3241 passed, 129 e2e, 92% coverage, lint clean.
+- Squash-merged to main, tagged prp-10, pushed. **All eleven PRPs complete.**

@@ -17,13 +17,14 @@ it. PRP-07's missed-session logic and PRP-10's badges import this module rather 
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy import text
 from sqlmodel import Session
 
-from cadence.historique.clock import same_iso_week, week_start
+from cadence.historique.clock import local_date, same_iso_week, week_start
 from cadence.historique.queries import finished_dates, total_rows_ticked
 from cadence.profils.tables import Profile
 from cadence.seance.catalog import band_rules, load_settings
@@ -85,6 +86,7 @@ class Scorecard:
 _WALK_SQL = """
 SELECT p.status AS status,
        COUNT(DISTINCT s.id) AS sessions,
+       MAX(s.finished_at) AS finished_at,
        COALESCE(SUM(CASE WHEN r.done THEN 1 ELSE 0 END), 0) AS rows_done
 FROM planned_session p
 LEFT JOIN session s ON s.planned_session_id = p.id AND s.finished_at IS NOT NULL
@@ -108,29 +110,76 @@ def current_streak(db: Session, profile_id: str) -> Streak:
     and every screen quoting the streak is quietly wrong. Anything that creates a second program
     per profile has to scope this query to the active one.
     """
-    profile = db.get(Profile, profile_id)
-    threshold = good_enough_after(band_rules(profile)) if profile is not None else 1
-    rows = db.execute(text(_WALK_SQL), {"profile_id": profile_id}).all()
-
     current = 0
     best = 0
-    for row in rows:
+    for step in _walk(db, profile_id):
+        if step.resets:
+            current = 0
+        elif step.complete:
+            current += 1
+            best = max(best, current)
+    return Streak(current=current, best=best)
+
+
+def streak_milestones(db: Session, profile_id: str, lengths: Iterable[int]) -> tuple[Streak, dict[int, date | None]]:
+    """The streak, plus the day it first reached each of ``lengths``.
+
+    Here rather than in ``historique.badges`` so the streak stays defined exactly once (PRP-10
+    risk 4): a badge that walked the plan itself would drift from the number the scorecard shows.
+
+    One walk for every length asked about, rather than one per badge. Two badges reading it meant
+    three walks of the same rows on a History render, and the count grew as they were earned —
+    which `test_history_page_is_not_n_plus_one` reads, correctly, as the page getting slower the
+    longer somebody trains.
+    """
+    wanted = sorted(lengths)
+    reached: dict[int, date | None] = dict.fromkeys(wanted)
+    current = 0
+    best = 0
+    for step in _walk(db, profile_id):
+        if step.resets:
+            current = 0
+            continue
+        if not step.complete:
+            continue
+        current += 1
+        best = max(best, current)
+        for length in wanted:
+            if current == length and reached[length] is None:
+                reached[length] = step.finished_on
+    return Streak(current=current, best=best), reached
+
+
+@dataclass(frozen=True, slots=True)
+class _Step:
+    """One planned row as the streak walk sees it."""
+
+    complete: bool
+    resets: bool
+    finished_on: date | None
+
+
+def _walk(db: Session, profile_id: str) -> list[_Step]:
+    """The walk itself, stopping at the first ``planned`` row. The rules are in the module docstring."""
+    profile = db.get(Profile, profile_id)
+    threshold = good_enough_after(band_rules(profile)) if profile is not None else 1
+    steps: list[_Step] = []
+    for row in db.execute(text(_WALK_SQL), {"profile_id": profile_id}).all():
         mapping = row._mapping
         status = str(mapping["status"])
         if status == PLANNED:
             break
         if status == SKIPPED:
-            current = 0
+            steps.append(_Step(complete=False, resets=True, finished_on=None))
             continue
         if status != DONE:
             # An unknown status is not a failure anyone chose; it holds rather than resets.
+            steps.append(_Step(complete=False, resets=False, finished_on=None))
             continue
         # A ``done`` row with no finished session cannot be shown to be complete, so it holds.
         complete = int(mapping["sessions"] or 0) > 0 and int(mapping["rows_done"] or 0) >= threshold
-        if complete:
-            current += 1
-            best = max(best, current)
-    return Streak(current=current, best=best)
+        steps.append(_Step(complete=complete, resets=False, finished_on=local_date(mapping["finished_at"])))
+    return steps
 
 
 def weekly_scorecard(db: Session, profile_id: str, today: date | None = None) -> Scorecard:

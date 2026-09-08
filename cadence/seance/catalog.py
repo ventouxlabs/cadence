@@ -114,3 +114,16 @@ def setup_complete(settings: ProgramSettings) -> bool:
     would have let a seeded install skip the one screen the son's age is asked on.
     """
     return settings.setup_complete
+
+
+def icon_id(exercise_id: str) -> str | None:
+    """The sprite symbol for an exercise, keyed on its movement pattern.
+
+    ``None`` for an id the library does not hold — an imported workout may name an inline
+    exercise, and a row without an icon is a row without an icon, never a broken ``<use>``.
+    """
+    bundle = library_bundle()
+    if bundle is None:
+        return None
+    exercise = bundle.exercises.get(exercise_id)
+    return f"i-{exercise.pattern.value}" if exercise is not None else None

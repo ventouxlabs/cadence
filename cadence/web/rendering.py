@@ -17,6 +17,7 @@ from cadence.programme.ladder import LB_TO_KG
 # they name rather than in the module that owns the Jinja environment.
 from cadence.schema.labels import DAY_TYPE_LABELS as DAY_TYPE_LABELS
 from cadence.schema.labels import day_label as day_label
+from cadence.seance.catalog import icon_id
 
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -88,4 +89,5 @@ templates.env.globals["prescription"] = prescription
 templates.env.globals["format_load"] = format_load
 templates.env.filters["load"] = format_load
 templates.env.globals["is_youth"] = is_youth
+templates.env.globals["icon_id"] = icon_id
 templates.env.globals["PROFILE_TABS"] = PROFILE_TABS

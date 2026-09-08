@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Today · Cadence{% endblock %}
 {% block content %}
+{% if view.sessions | selectattr("is_youth") | list %}{% include "partials/icons.html" %}{% endif %}
 {% if nudge %}
 {# One line, from the metrics cache, on the parent's screens only. Never a network call: Today is
    the hot path, and the son's profile never carries a body metric of any kind. #}
@@ -12,10 +13,18 @@
 {% if assessment_due %}{% include "partials/assessment_card.html" %}{% endif %}
 <div class="columns{% if view.together %} columns-two{% endif %}">
   {% for item in view.sessions %}
-  <section class="session" aria-labelledby="head-{{ item.profile.id }}" data-profile="{{ item.profile.id }}">
+  <section class="session" aria-labelledby="head-{{ item.profile.id }}" data-profile="{{ item.profile.id }}"
+           {% if item.is_youth %}data-profile-kind="youth"{% endif %}>
     <h1 class="session-head" id="head-{{ item.profile.id }}">
       {% if view.together %}{{ item.profile.display_name }} — {% endif %}{{ day_label(item.planned.day_type) }}
+      {% if item.is_youth %}
+      {# Copy, not stats: the son's screen counts things to do, never minutes or weeks. Pluralised
+         the way the Done summary pluralises its minutes — a one-row day read "1 things. Go." #}
+      {% set todo = item.rows | rejectattr("is_prelude") | list | length %}
+      <span class="session-sub">{{ todo }} thing{{ '' if todo == 1 else 's' }}. Go.</span>
+      {% else %}
       <span class="session-sub">week {{ item.planned.week }} · {{ view.settings.session_minutes }} min</span>
+      {% endif %}
     </h1>
     {% set prelude = item.rows | selectattr("is_prelude") | list %}
     {% set training = item.rows | rejectattr("is_prelude") | list %}

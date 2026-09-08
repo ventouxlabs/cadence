@@ -64,7 +64,7 @@ class SessionDetail:
     rows: tuple[DetailRow, ...]
 
 
-def _spec_index(raw: str, session_id: str) -> dict[int, dict[str, Any]]:
+def spec_index(raw: str, session_id: str) -> dict[int, dict[str, Any]]:
     """The planned specs by position. A plan that will not parse yields no names, not an error.
 
     An empty string is the ordinary case for a session whose planned row has been deleted, so it
@@ -105,7 +105,7 @@ def session_detail(db: Session, session_id: str) -> SessionDetail | None:
     if not rows:
         return None
     first = rows[0]._mapping
-    specs = _spec_index(str(first["rows_json"] or ""), session_id)
+    specs = spec_index(str(first["rows_json"] or ""), session_id)
     return SessionDetail(
         session_id=session_id,
         profile_id=str(first["profile_id"]),

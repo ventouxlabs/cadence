@@ -421,3 +421,89 @@ a.brand {
 .assess-card-actions .action { flex: 1 1 0; justify-content: center; }
 
 .action-quiet { width: 100%; font: inherit; color: var(--ink-soft); cursor: pointer; }
+
+/* ------------------------------------------------------------------ son mode (PRP-10)
+   One scope, not a second template tree (risk 1). `[data-profile-kind="youth"]` is on the body
+   for the son's own tab and on his <section> alone on Together, so the parent standing beside
+   him keeps the adult type scale in the same document. Everything below is one selector deep on
+   that attribute; nothing here changes behaviour, only size, weight and wording. */
+
+[data-profile-kind="youth"] .row { min-height: 64px; }
+
+[data-profile-kind="youth"] .row-name { font-size: 18px; }
+[data-profile-kind="youth"] .row-line { font-size: 16px; }
+[data-profile-kind="youth"] .row-cue,
+[data-profile-kind="youth"] .row-note { font-size: 15px; }
+[data-profile-kind="youth"] .session-head { font-size: 21px; }
+[data-profile-kind="youth"] .session-sub { font-size: 16px; }
+
+/* The icon sits in the flow with a reserved 32x32 box, so a slow paint cannot move the name. */
+[data-profile-kind="youth"] .row-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  vertical-align: -6px;
+  margin-right: 8px;
+}
+/* The sprite itself is a definitions block, never a drawn element. */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* The parent's rows carry no icon at all: one scope, so the markup is shared and the size is not. */
+.row-icon { display: none; }
+[data-profile-kind="youth"] .row-icon { display: inline-block; }
+
+/* The Done screen. `done.html` uses none of the row selectors above, so without these four the
+   son's summary rendered at the adult scale while Today beside it did not (D-247). */
+[data-profile-kind="youth"] .summary-head { font-size: 28px; }
+[data-profile-kind="youth"] .summary-who { font-size: 19px; }
+[data-profile-kind="youth"] .summary-line { font-size: 20px; }
+[data-profile-kind="youth"] .action { font-size: 18px; min-height: var(--tap); }
+
+.summary-badge {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--go);
+  color: var(--go-ink);
+  font-weight: 700;
+}
+
+[data-profile-kind="youth"] .summary-badge { font-size: 18px; }
+
+/* The exit, given real weight. Principles 3.7 P6 keeps it always tappable; this only promotes it. */
+[data-profile-kind="youth"] .done,
+[data-profile-kind="youth"] .exit { min-height: var(--tap); font-size: 20px; font-weight: 700; }
+/* Filled and taller, so "you may stop now" is the loudest thing on the screen once he may. */
+[data-profile-kind="youth"] .done-promoted,
+[data-profile-kind="youth"] .exit-promoted {
+  background: var(--go);
+  color: var(--go-ink);
+  border-color: var(--go);
+  min-height: 72px;
+  font-size: 22px;
+}
+
+/* The tick animation. 200 ms, on the check box alone, `transform` and `opacity` only — neither
+   is a layout property, so it cannot shift the row (PRP-10 "Layout shift"). It runs on insert,
+   which is exactly when HTMX swaps a freshly ticked row in, so no JavaScript arms it.
+
+   Written as "on by default, off under `reduce`" rather than inside the PRP's
+   `prefers-reduced-motion: no-preference` wrapper (D-235): a browser that reports no preference
+   at all — headless Chromium among them — matches neither query, and under the PRP's form that
+   silently means no animation for anybody. The observable behaviour is identical wherever the
+   preference is actually expressed, which is every real phone. */
+[data-profile-kind="youth"] .row-done .tick { animation: tick-pop 200ms ease-out 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-profile-kind="youth"] .row-done .tick { animation: none; }
+}
+
+@keyframes tick-pop {
+  0%   { transform: scale(1); opacity: 0.55; }
+  55%  { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}

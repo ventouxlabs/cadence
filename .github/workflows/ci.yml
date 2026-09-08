@@ -28,6 +28,18 @@ jobs:
       - run: uv sync --all-extras --dev
       - run: uv run playwright install --with-deps chromium
       - run: uv run pytest tests/e2e --browser chromium -o addopts=""
+      # The same script `make screenshots` runs. It seeds its own throwaway databases, so this
+      # never touches anything real, and the artifact is how a reviewer sees the screens without
+      # checking the branch out. `if: always()` so a failing assertion still leaves the pictures
+      # of what it was looking at.
+      - name: Screenshots
+        run: uv run python scripts/screenshots.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: docs/screenshots/
+          if-no-files-found: error
 
   image:
     # Build only, never push. PRP-09 keeps the image out of any registry: it would carry the

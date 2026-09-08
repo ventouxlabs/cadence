@@ -1,4 +1,24 @@
-{# Placeholder container. PRP-10 adds cadence/historique/badges.py and the strip that fills this.
-   The id carries the profile because Together renders two columns and duplicate ids break every
-   locator (D-074, D-104). #}
-<section class="badges" id="badges-{{ column.profile.id }}" data-role="badges" aria-label="Badges"></section>
+{# The badge strip. Earned tiles are filled, unearned outlined; tapping one swaps the caption line
+   below and nothing else. The ids carry the profile because Together renders two columns and
+   duplicate ids break every locator (D-074, D-104, D-233). #}
+<section class="badges card" id="badges-{{ column.profile.id }}" data-role="badges" aria-labelledby="badges-head-{{ column.profile.id }}">
+  <h2 class="group" id="badges-head-{{ column.profile.id }}">Badges</h2>
+  <ul class="badge-strip">
+    {% for badge in column.badges %}
+    <li>
+      <button type="button" class="badge{% if badge.earned %} badge-on{% endif %}"
+              data-badge="{{ badge.id }}" data-earned="{{ 'true' if badge.earned else 'false' }}"
+              {# No `aria-pressed`: a tile is not a toggle, it swaps the caption below. The tile
+                 never changes state, and the caption is the live region that announces the
+                 change (`role="status"`), so a hardcoded "false" was only ever a lie (D-253). #}
+              aria-label="{{ badge.caption }}"
+              hx-get="/history/badges/{{ column.profile.id }}/{{ badge.id }}?profile={{ profile_key }}"
+              hx-target="#badge-caption-{{ column.profile.id }}" hx-swap="outerHTML">
+        <span class="badge-mark" aria-hidden="true">{% if badge.earned %}&#10003;{% endif %}</span>
+        <span class="badge-short" aria-hidden="true">{{ badge.short }}</span>
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% include "partials/badge_caption.html" %}
+</section>
