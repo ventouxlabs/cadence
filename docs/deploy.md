@@ -49,6 +49,23 @@ On the **workstation**:
 
 ## 2. First deploy
 
+> **As actually deployed on VM-201, 2026-09-07 (D-257).** The live install is at
+> **`/home/user/docker/cadence`**, not `/opt/cadence` — VitalForge lives at
+> `~/docker/vitalforge`, and matching the host's own convention beat matching this document.
+> It was deployed by `git clone` of the public repo rather than by `make deploy`, because the
+> workstation had nothing to rsync that GitHub did not already have. Substitute that path
+> throughout this file. Everything else below is accurate.
+>
+> **A manual clone skips `scripts/deploy.sh`, and therefore skips the chown.** That is the one
+> step a `git clone && docker compose up` path silently misses, and it fails exactly as
+> described below: `unable to open database file`, container in `Restarting`, healthy-looking
+> compose output right up until it isn't. Run the chown before the first `up`:
+>
+> ```bash
+> mkdir -p ~/docker/cadence/data/backups
+> sudo chown -R 10001:10001 ~/docker/cadence/data
+> ```
+
 ```bash
 # On VM-201, once.
 sudo mkdir -p /opt/cadence && sudo chown "$USER" /opt/cadence
