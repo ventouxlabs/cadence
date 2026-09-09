@@ -97,3 +97,12 @@ Five lines per PRP, appended by the orchestrator after each squash-merge.
 - Orchestrator pushed back once more: a hardcoded `youth_safe=True` with an explanatory comment was replaced with a real per-rule filter and a test proving an unsafe rule is actually excluded, matching the project's standing rule that "safe by accident" always gets an enforced gate.
 - Final: 3241 passed, 129 e2e, 92% coverage, lint clean.
 - Squash-merged to main, tagged prp-10, pushed. **All eleven PRPs complete.**
+
+## solo mode — 2026-09-09 (post-PRP feature, JD request)
+- JD: "lets hide my son's window and i will just do it. if he wants to participate later, i will reenable."
+- Implementer built `son_enabled` + `profils/visibility.py`, `web/solo.py`, `api/gates.py`; found and fixed two pre-existing bugs (D-267 stale tab strip, D-268 history_card authorising itself).
+- Reviewer: 1 High (`/done/{id}` rendered his session in full while hidden — proven empirically, 200/1856 bytes) + 4 Lows. Implementer correctly rejected the orchestrator's prescribed fix (query-keyed check would have 404'd every offline Done) and gated on session owner instead.
+- Finding 5's worst branch was unreported: the redisplay-on-rejected-value path leaked his whole form without needing a valid post.
+- Re-verified by probe: all 5 FIXED, writes still land (assessment rows 0→6 while hidden), no regressions. APPROVE.
+- Also landed: docs/CODEMAPS (5 files), docs/CONTRIBUTING.md, and D-275 — `CADENCE_BIND_ADDR` was missing from `.env.example` because the parity test could not express a Compose-only key.
+- Final: 3326 passed, 135 e2e, 93% coverage. Squash-merged to main, tagged solo-mode, pushed, deployed to VM-201.

@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from cadence.api.envelope import err, ok
+from cadence.api.gates import refuse_hidden
 from cadence.db import get_session
 from cadence.seance.catalog import display_unit
 from cadence.seance.status import good_enough_after
@@ -84,6 +85,9 @@ def api_today(
     db: Annotated[Session, Depends(get_session)],
     profile: Annotated[str | None, Query()] = None,
 ) -> Any:
+    hidden = refuse_hidden(db, profile)
+    if hidden is not None:
+        return hidden
     try:
         view = resolve_today(db, profile)
     except TodayError as exc:

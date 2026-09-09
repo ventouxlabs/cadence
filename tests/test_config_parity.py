@@ -42,12 +42,29 @@ def _env_example_entries() -> dict[str, str]:
     return entries
 
 
+#: Keys `.env` carries for **Compose**, not for the app. `.env` has two readers: pydantic-settings
+#: builds `Settings` from it, and `docker compose` interpolates `${...}` in the compose files from
+#: the same file. `CADENCE_BIND_ADDR` is the host interface the port is published on
+#: (`docker-compose.yml`), which the process inside the container cannot know and must not read.
+#: It belongs in the template because an operator has to set it (D-205), so the parity rule below
+#: allows exactly these, and nothing else, to appear without a `Settings` field.
+COMPOSE_ONLY_KEYS = frozenset({"CADENCE_BIND_ADDR"})
+
+
 def test_env_example_keys_equal_the_settings_env_aliases() -> None:
-    """No drift in either direction."""
+    """No drift in either direction, except the documented Compose-only keys."""
     documented = set(_env_example_entries())
     declared = _env_aliases()
-    assert documented - declared == set(), "documented in .env.example but not read by Settings"
+    extra = documented - declared - COMPOSE_ONLY_KEYS
+    assert extra == set(), "documented in .env.example but not read by Settings"
     assert declared - documented == set(), "read by Settings but missing from .env.example"
+
+
+def test_every_compose_only_key_is_actually_used_by_compose() -> None:
+    """A key exempted from the parity rule has to earn it, or the exemption is a hiding place."""
+    compose = (ENV_EXAMPLE.parent / "docker-compose.yml").read_text()
+    for key in COMPOSE_ONLY_KEYS:
+        assert f"${{{key}" in compose, f"{key} is exempt from parity but no compose file interpolates it"
 
 
 def test_env_aliases_are_upper_snake_case() -> None:

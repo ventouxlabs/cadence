@@ -28,6 +28,7 @@ SETTING_KEYS: tuple[str, ...] = (
     "timers_default_on",
     "readiness_nudge_on",
     "display_unit",
+    "son_enabled",
 )
 
 DEFAULT_EQUIPMENT: tuple[Equipment, ...] = (
@@ -59,6 +60,12 @@ class ProgramSettings(CadenceModel):
     timers_default_on: StrictBool = False
     readiness_nudge_on: StrictBool = True
     display_unit: DisplayUnit = "kg"
+    # D-260. Whether the household is training two people or one. Default on, because that is the
+    # household Cadence was built for and an install that never touches this setting must behave
+    # exactly as it did before the setting existed. Off **hides**: the son's profile, program,
+    # planned days, sessions, assessments and challenges all stay where they are, which is what
+    # makes turning it back on a no-op rather than a restore (D-261).
+    son_enabled: StrictBool = True
 
     @field_validator("session_minutes")
     @classmethod
@@ -88,7 +95,7 @@ class ProgramSettings(CadenceModel):
         return ProgramSettings.model_validate({**self.model_dump(mode="json"), **fields})
 
     def as_rows(self) -> dict[str, str]:
-        """The nine ``setting`` rows this object serialises to, as JSON text."""
+        """The ``setting`` rows this object serialises to, as JSON text - one per ``SETTING_KEYS``."""
         dumped = self.model_dump(mode="json")
         return {key: json.dumps(dumped[key]) for key in SETTING_KEYS}
 

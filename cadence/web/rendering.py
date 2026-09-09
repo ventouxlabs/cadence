@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi.templating import Jinja2Templates
 
+from cadence.profils.visibility import ALL_PROFILE_TABS
 from cadence.programme.ladder import LB_TO_KG
 
 # Re-exported: the day names are vocabulary two packages share, so they live beside the enum
@@ -22,7 +23,21 @@ from cadence.seance.catalog import icon_id
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
-PROFILE_TABS: tuple[tuple[str, str], ...] = (("me", "Me"), ("son", "Son"), ("together", "Both"))
+
+def profile_tabs(request: Any) -> tuple[tuple[str, str], ...]:
+    """The tab strip for *this* request, not a frozen list of three (D-263).
+
+    ``cadence.web.solo.require_visible_profile`` puts the answer on ``request.state`` from the
+    household's ``son_enabled``; this is the template's way of reading it. It is a function rather
+    than a context key because ``base.html`` is reached from a dozen render sites - two routers'
+    error pages and several hand-rendered partials among them - and one of them forgetting to pass
+    a key would be a crash on an unrelated screen rather than a missing tab.
+
+    A request that never met the dependency falls back to all three tabs, which is the behaviour
+    the app had before this setting existed. ``tests/test_solo_parity.py`` is what stops that
+    fallback from quietly becoming the answer on a screen added later.
+    """
+    return tuple(getattr(getattr(request, "state", None), "profile_tabs", ALL_PROFILE_TABS))
 
 
 def is_youth(profile: Any) -> bool:
@@ -90,4 +105,4 @@ templates.env.globals["format_load"] = format_load
 templates.env.filters["load"] = format_load
 templates.env.globals["is_youth"] = is_youth
 templates.env.globals["icon_id"] = icon_id
-templates.env.globals["PROFILE_TABS"] = PROFILE_TABS
+templates.env.globals["profile_tabs"] = profile_tabs

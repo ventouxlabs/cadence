@@ -28,11 +28,13 @@ from cadence.bilan import service
 from cadence.bilan.gaps import ThresholdError
 from cadence.db import get_session
 from cadence.profils.tables import PROFILE_ME, Profile
+from cadence.profils.visibility import is_hidden
 from cadence.programme.bands import age_band
 from cadence.programme.tables import PLANNED, SKIPPED, PlannedSession
 from cadence.schema.enums import AssessmentId
 from cadence.seance.catalog import library_bundle, load_settings
 from cadence.web.rendering import templates
+from cadence.web.solo import SOLO_HOME, ProfileHidden
 
 router = APIRouter(tags=["assess"])
 
@@ -278,6 +280,17 @@ def _one_result(library: LibraryBundle, field: TestField, form: Any, *, is_youth
     return bilan.parse_result(library.assessments, payload, is_youth=is_youth)
 
 
+def _hidden_here() -> ProfileHidden:
+    """The bounce a hidden profile's check-in gets, once its write has already gone through.
+
+    ``ProfileHidden`` rather than a ``RedirectResponse`` built here, so the one handler in
+    ``create_app`` decides the shape: a 303 for a plain post, ``HX-Redirect`` for an HTMX one.
+    This form posts both ways, and a 303 answering the HTMX post would swap the parent's whole
+    check-in page into the result panel (D-269).
+    """
+    return ProfileHidden(f"{ASSESS_TAB}?profile={PROFILE_ME}")
+
+
 def _render_form(request: Request, context: dict[str, Any], status: int) -> Response:
     """The form alone for HTMX, the whole page for a plain post. Never a separate error page."""
     if _is_htmx(request):
@@ -300,6 +313,12 @@ async def assess_save(
     if isinstance(resolved, Response):
         return resolved
     person, key = resolved
+    # Solo mode splits this route in two (D-276). The **write** goes through exactly as it always
+    # did - D-264 and D-265 both say a hidden profile costs the screen and never the data - but
+    # every answer that carries *his page* is replaced by a bounce to the parent's own. Without
+    # this the route recorded the battery correctly and then handed back 7.7 KB of his screen,
+    # youth scope and all, on a household that had hidden him.
+    hidden = is_hidden(load_settings(db), key)
     library = library_bundle()
     if library is None:
         return _error_page(request, LIBRARY_DOWN, UNAVAILABLE)
@@ -311,12 +330,20 @@ async def assess_save(
         results = [_one_result(library, field, form, is_youth=is_youth) for field in fields]
         state = service.save_battery(db, person, results, library, load_settings(db), _today(), _today())
     except bilan.AssessmentError as exc:
+        if hidden:
+            # The redisplay is his form, with his tests named in his vocabulary, so it is the one
+            # answer that cannot be given. Nothing is lost that a stale page had any right to.
+            raise _hidden_here() from exc
         context = _context(request, db, person, key, library, error=str(exc), posted=form)
         return _render_form(request, context, UNPROCESSABLE)
     except ThresholdError as exc:
         # A zero ``ok`` threshold is a broken library, not a broken form: say so on its own page.
+        # Safe while hidden - ``_error_page`` renders the generic message on the parent's tab.
         return _error_page(request, str(exc), 500)
 
+    # Saved. The battery is his and it is recorded; the screen that would report it is not.
+    if hidden:
+        raise _hidden_here()
     capped = len(state.capped)
     if not _is_htmx(request):
         suffix = f"&capped={capped}" if capped else ""
@@ -357,6 +384,11 @@ def assess_skip(
         planned.status = SKIPPED
         db.add(planned)
         db.commit()
+    # The skip is his and it lands; where it sends the browser is not (D-276). This route leaks no
+    # markup either way - it only ever redirects - but naming him in the ``Location`` costs a hop
+    # through Today's own gate and puts a hidden profile in a header for no reason.
+    if is_hidden(load_settings(db), key):
+        raise ProfileHidden(SOLO_HOME)
     # The tab the card was tapped on, so skipping from Together comes back to Together. A tab
     # nobody has is not a redirect target: it would land the user on Today's 404 page.
     back = (tab or key).strip().lower()

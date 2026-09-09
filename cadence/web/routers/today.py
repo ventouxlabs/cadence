@@ -37,6 +37,7 @@ from cadence.vitalforge.schedule import REFUSALS
 from cadence.vitalforge.sync import ForceRefused, drain
 from cadence.vitalforge.writeback import line_for_session
 from cadence.web.rendering import is_youth, templates
+from cadence.web.solo import refuse_hidden_owner
 
 router = APIRouter(tags=["today"])
 
@@ -333,6 +334,12 @@ def done_page(
     view = view_for_session(db, record) if record is not None else None
     if view is None:
         return _error_page(request, f"no session {session_id!r}", 404)
+    # Whose session this is, not which tab was asked for (D-271). The tab check in the dependency
+    # cannot see this: ``app.js`` lands a queued Done on ``/done/{id}`` with no ``?profile=`` at
+    # all, so ``?profile=me`` and no query alike were rendering the hidden son's summary, youth
+    # scope and all. The work itself already landed through the ungated write - this costs the
+    # screen and nothing else, which is exactly what D-264 reserves the right to do.
+    refuse_hidden_owner(db, view.record.profile_id)
     # Only what is actually finished: a youth exit leaves the parent's checklist open, and
     # summarising an unfinished session would report a session nobody has ended.
     members = [item for item in group_members(db, view.record) if is_finished(item)] or [view.record]

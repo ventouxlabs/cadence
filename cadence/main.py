@@ -37,6 +37,7 @@ from cadence.web.routers import pwa
 from cadence.web.routers import settings as web_settings
 from cadence.web.routers import settings_ai as web_settings_ai
 from cadence.web.routers import today as web_today
+from cadence.web.solo import ProfileHidden, hidden_redirect, require_visible_profile
 
 # Later PRPs append one line each.
 ROUTERS: list[APIRouter] = [
@@ -64,6 +65,17 @@ ROUTERS: list[APIRouter] = [
 # profile whose age has never been asked for has been training against the strictest defaults, so
 # the screen would be showing work done under rules nobody chose.
 GATED_ROUTERS: list[APIRouter] = [web_today.router, web_history.router, web_assess.router]
+
+# Every router that renders a template extending `base.html`, and so every router whose tab strip
+# has to be built from `son_enabled` rather than from a constant (D-262). Listed here for the same
+# reason `GATED_ROUTERS` is: a screen added later is covered by being registered rather than by
+# somebody remembering, and `tests/test_solo_parity.py` fails if a full-page template turns up in
+# a router that is not on this list.
+#
+# `settings_ai` is deliberately absent - it renders partials only, never a page with a header. So
+# is `pwa`: `/sw.js` and `/manifest.json` are fetched by the browser itself and have no business
+# opening a database session.
+TABBED_ROUTERS: list[APIRouter] = [*GATED_ROUTERS, web_settings.router]
 
 # D-025: the one middleware in this app. Vendored HTMX is ~50 KB raw and ~17 KB gzipped, so the
 # 60 KB budget for /today (architecture section 5) is unreachable without it. 500 bytes is the
@@ -119,6 +131,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(status_code=422, content=err(f"this request body is not valid: {fields}"))
 
     app.add_exception_handler(SetupRequired, setup_redirect)
+    # A screen asked for a profile this household is not showing. A 303 back to the same screen on
+    # the parent's tab, never a 404: a stale bookmark or a cached page is not an error (D-260).
+    app.add_exception_handler(ProfileHidden, hidden_redirect)
     # A request refused before its body was read: too large to accept, or from another
     # site. Answered in the envelope for /api and as the panel's partial for Settings.
     app.add_exception_handler(RequestRefused, refusal_response)
@@ -127,7 +142,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings is not None:
         app.dependency_overrides[get_settings] = lambda: active
     for router in ROUTERS:
-        app.include_router(router)
+        app.include_router(router, dependencies=_solo_dependencies(router))
     # Mock-mode only, and never under prod. The fake's recorder is the one place that can say
     # whether a session reported as synced actually produced one activity and not zero or two,
     # which is what PRP-09's smoke test asserts (D-169). Settings validation already refuses
@@ -135,9 +150,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if active.vitalforge_mode == MOCK_MODE and active.env != "prod":
         app.include_router(mock_inspect.router)
     for router in GATED_ROUTERS:
-        app.include_router(router, dependencies=[Depends(require_setup)])
+        app.include_router(router, dependencies=[Depends(require_setup), *_solo_dependencies(router)])
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     return app
+
+
+def _solo_dependencies(router: APIRouter) -> list[Any]:
+    """The solo-mode dependency, for a router that renders a page with a tab strip and no other."""
+    return [Depends(require_visible_profile)] if any(router is item for item in TABBED_ROUTERS) else []
 
 
 def _refresh_bands(engine: Any) -> None:

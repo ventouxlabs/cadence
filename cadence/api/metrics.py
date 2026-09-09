@@ -19,6 +19,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from cadence.api.envelope import err, ok
+from cadence.api.gates import refuse_hidden
 from cadence.db import get_session
 from cadence.profils.tables import Profile
 from cadence.vitalforge.metrics import ProfileMetrics, read_cached
@@ -32,6 +33,11 @@ def metrics(
     profile: Annotated[str, Query()] = "me",
 ) -> Any:
     """The cached payload, or an honest empty one flagged stale."""
+    # The same sentence line 41 gives a profile that is not there: hidden and absent must not be
+    # tellable apart from outside (D-273).
+    hidden = refuse_hidden(db, profile, f"no profile {profile!r}")
+    if hidden is not None:
+        return hidden
     record = db.get(Profile, profile.strip().lower())
     if record is None:
         return JSONResponse(status_code=404, content=err(f"no profile {profile!r}"))

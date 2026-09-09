@@ -171,6 +171,7 @@ def _state_form(settings: ProgramSettings, me: Profile, son: Profile) -> dict[st
         "session_minutes": settings.session_minutes,
         "has_overhead_anchor": me.has_overhead_anchor,
         "push_son_to_garmin": settings.push_son_to_garmin,
+        "son_enabled": settings.son_enabled,
         "display_unit": settings.display_unit,
         "person_me": me.vitalforge_person,
         "person_son": son.vitalforge_person,
@@ -295,9 +296,11 @@ def _submitted(
     person_me: str | None,
     person_son: str | None,
     bodyweight_kg: str | None,
+    son_enabled: str | None = None,
 ) -> dict[str, Any]:
     """The values the browser posted, kept exactly as typed so a rejected form redisplays them."""
     return {
+        "son_enabled": ABSENT if son_enabled is None else son_enabled == "1",
         "son_age": ABSENT if son_age is None else son_age.strip(),
         "equipment": list(equipment),
         "weights_available": ABSENT if weights_available is None else weights_available.strip(),
@@ -319,6 +322,11 @@ def _patches(form: dict[str, Any], mode: str) -> tuple[dict[str, Any], dict[str,
     is a fact about the room, not about a person, and asking twice would let the two answers
     disagree (D-095). ``push_to_garmin`` on the son is deliberately not written here - D-021 makes
     the household setting the single source of that, read at payload-build time.
+
+    Hiding the son costs him nothing precisely because of ``_present``: with the toggle off the
+    form does not render his age, his slug or his Garmin switch, the browser therefore posts none
+    of them, and a field the form did not send is dropped from the patch rather than written as
+    empty. Turning him back on finds every one of those values where he left it (D-261).
     """
     settings_patch = _present(
         {
@@ -328,6 +336,7 @@ def _patches(form: dict[str, Any], mode: str) -> tuple[dict[str, Any], dict[str,
             "session_minutes": form["session_minutes"],
             "push_son_to_garmin": form["push_son_to_garmin"],
             "display_unit": form["display_unit"],
+            "son_enabled": form["son_enabled"],
         }
     )
     if mode == "setup":
@@ -402,6 +411,15 @@ def _save(request: Request, db: Session, mode: str, form: dict[str, Any]) -> Res
     if mode == "setup":
         return _to("/today?profile=me", request)
     fresh = services.get_settings(db)
+    if fresh.son_enabled != settings.son_enabled:
+        # This save changed the page's *chrome*, not just its form. The screen posts through HTMX
+        # and swaps `#settings-form` alone, so the tab strip in the header is outside the fragment
+        # that comes back: without a real navigation the header would keep offering a "Son" tab
+        # that solo mode has just hidden, and go on offering it until the next page load. A
+        # redirect re-fetches the whole document, which is the only thing that can repaint a part
+        # of the page this form does not own (D-267). The visible reload is the confirmation here,
+        # which is why it costs the transient "Saved." line and does not need it.
+        return _to("/settings", request)
     me, son = _profile(db, PROFILE_ME), _profile(db, PROFILE_SON)
     context = _context(request, mode, fresh, me, son, _state_form(fresh, me, son), saved=True)
     return _render_form(request, context, 200)
@@ -473,6 +491,7 @@ def settings_save(
     person_me: Annotated[str | None, Form()] = None,
     person_son: Annotated[str | None, Form()] = None,
     bodyweight_kg: Annotated[str | None, Form()] = None,
+    son_enabled: Annotated[str | None, Form()] = None,
 ) -> Response:
     form = _submitted(
         equipment,
@@ -486,6 +505,7 @@ def settings_save(
         person_me,
         person_son,
         bodyweight_kg,
+        son_enabled,
     )
     return _save(request, db, "settings", form)
 

@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from cadence.api.envelope import err, ok
+from cadence.api.gates import refuse_hidden
 from cadence.db import get_session
 from cadence.historique.page import build_page, resolve_profiles
 from cadence.historique.queries import DEFAULT_LIMIT, LimitOutOfRange, clamp_limit, recent_sessions
@@ -37,6 +38,9 @@ def api_sessions(
     limit: Annotated[int, Query()] = DEFAULT_LIMIT,
 ) -> Any:
     """The profile's finished sessions, newest first. ``limit`` is 1..200; anything else is 422."""
+    hidden = refuse_hidden(db, profile)
+    if hidden is not None:
+        return hidden
     try:
         size = clamp_limit(limit)
         _key, profiles = resolve_profiles(db, profile)
@@ -63,6 +67,9 @@ def api_scorecard(
     profile: Annotated[str | None, Query()] = None,
 ) -> Any:
     """This week against the plan, the streak, and — for an adult profile only — the trend."""
+    hidden = refuse_hidden(db, profile)
+    if hidden is not None:
+        return hidden
     try:
         view = build_page(db, profile, limit=1)
     except TodayError as exc:

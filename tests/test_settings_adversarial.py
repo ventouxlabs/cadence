@@ -407,10 +407,13 @@ async def test_the_son_is_not_aged_by_a_save_that_failed_elsewhere(
 
 
 async def test_the_settings_payload_never_grows_a_key_by_accident(seeded_client: httpx.AsyncClient) -> None:
-    """The nine keys plus the parser's warnings, and nothing else: PRP-08 reads this shape."""
+    """The stored keys plus the parser's warnings, and nothing else: PRP-08 reads this shape."""
     data = await _settings(seeded_client)
     assert set(data) == set(SETTING_KEYS) | {"weights_warnings"}
-    assert len(SETTING_KEYS) == 9
+    # Ten since D-260 added ``son_enabled``. The count is pinned deliberately: a key that appears
+    # here without somebody deciding to add it is a key the payload grew by accident, which is
+    # exactly what this test is named after.
+    assert len(SETTING_KEYS) == 10
 
 
 # ------------------------------------------------------------- the person slugs

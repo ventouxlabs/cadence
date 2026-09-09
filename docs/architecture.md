@@ -41,7 +41,7 @@ docs/                   # this file, principles, contract, prp/, DECISIONS, BUIL
 | Table | Key columns | Notes |
 |---|---|---|
 | `profile` | `id` (slug: `me`, `son`), `display_name`, `kind` (`adult`/`youth`), `age_years`, `age_recorded_on`, `vitalforge_person` (slug), `push_to_garmin` (bool) | Two seeded rows. Youth band derived from age (see principles). Until `age_years` is set, band = strictest. |
-| `setting` | `key` (pk), `value_json`, `updated_at` | Key/value; keys: `equipment`, `weights_available`, `days_per_week`, `session_minutes`, `push_son_to_garmin`, `setup_complete`, `timers_default_on`, `readiness_nudge_on`. |
+| `setting` | `key` (pk), `value_json`, `updated_at` | Key/value; keys: `equipment`, `weights_available`, `days_per_week`, `session_minutes`, `push_son_to_garmin`, `setup_complete`, `timers_default_on`, `readiness_nudge_on`, `display_unit` (D-090), `son_enabled` (D-260). The list in `cadence/profils/settings.py::SETTING_KEYS` is the authority. |
 | `exercise` | `id` (kebab slug), `doc_json`, `source` (`seed`/`import`/`generated`), `created_at` | `doc_json` is the validated `Exercise` model dump. |
 | `workout` | `id`, `doc_json`, `source`, `target_profile_kind`, `created_at` | Validated `Workout` model dump. |
 | `program` | `id`, `profile_id`, `template`, `start_date`, `weeks`, `days_per_week`, `session_minutes`, `status` | One active program per profile. Rebuilt when settings change. |

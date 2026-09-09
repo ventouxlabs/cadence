@@ -85,8 +85,16 @@ def history_card(
     # ``resolve_profiles`` rather than a literal whitelist, so the tab is normalised (case and
     # surrounding space) and read against the profiles that actually exist, exactly as the page
     # itself reads it. A second copy of the key list here is a second thing to keep in step.
+    #
+    # The tab comes from ``?profile=`` **only**, never from the session (D-268). Falling back to
+    # ``summary.profile_id`` made the check answer its own question - a request without a query
+    # string authorised itself from the very session it was meant to be authorising, so it always
+    # passed. That is D-249 word for word, fixed then on ``badge_caption`` below and missed here;
+    # solo mode is what made it visible, because a card of the son's would still render on a
+    # household that had hidden him. Every link the templates build carries the query
+    # (``partials/session_row.html``), so nothing legitimate depended on the fallback.
     try:
-        profile_key, profiles = resolve_profiles(db, profile or summary.profile_id)
+        profile_key, profiles = resolve_profiles(db, profile)
     except TodayError:
         return _error_page(request, f"no finished session {session_id!r}", 404)
     if summary.profile_id not in {item.id for item in profiles}:

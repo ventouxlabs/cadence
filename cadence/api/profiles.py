@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from cadence.api.envelope import err, ok
+from cadence.api.gates import refuse_hidden
 from cadence.db import get_session
 from cadence.profils import services
 from cadence.profils.services import RebuildUnavailable
@@ -33,6 +34,17 @@ UNAVAILABLE = 503
 
 @router.get("/profiles/{profile_id}")
 def read_profile(profile_id: str, db: Annotated[Session, Depends(get_session)]) -> Any:
+    """One profile, or a 404 for one solo mode is hiding (D-265).
+
+    Addressed by path rather than by ``?profile=``, which is why the gate is called by hand here.
+    Gated for the same reason ``/api/metrics`` is - it is a read, and the two are addressed the
+    same way, so drawing the line between them would put it in two places in one API. The two
+    ``PUT``s below it are writes and stay open, per D-264.
+    """
+    # Word for word what an absent profile gets four lines down (D-273).
+    hidden = refuse_hidden(db, profile_id, f"there is no profile {profile_id!r}")
+    if hidden is not None:
+        return hidden
     profile = services.get_profile(db, profile_id)
     if profile is None:
         return JSONResponse(status_code=NOT_FOUND, content=err(f"there is no profile {profile_id!r}"))

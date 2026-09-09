@@ -32,7 +32,9 @@
   {# Today is the landing screen, so the brand goes there and History is the one extra link. #}
   <a class="brand" href="/today?profile={{ tab_profile }}">Cadence</a>
   <nav class="tabs" aria-label="Profile">
-    {% for key, label in PROFILE_TABS %}
+    {# Built from this household's `son_enabled`, not from a module constant: with the son hidden
+       there is one tab, and a "Son" link that only redirects back here is not a tab (D-263). #}
+    {% for key, label in profile_tabs(request) %}
     <a class="tab{% if key == profile_key %} tab-on{% endif %}" href="{{ tab_base }}?profile={{ key }}"
        {% if key == profile_key %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}

@@ -4,6 +4,14 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 
 ## [Unreleased]
 
+### solo mode (2026-09-09)
+- New `son_enabled` setting (default on): hides the son's profile everywhere — tabs drop to "Me", HTML screens bounce `?profile=son|together` to `?profile=me`, profile-addressed JSON reads 404 with wording identical to an absent profile.
+- **Nothing of his is deleted.** Toggling is not a rebuild trigger, so his program, sessions, assessments, challenges and Garmin preference survive the round trip untouched; flipping it back restores his plan exactly.
+- Writes are never dropped by a display setting: the gate is GET-only, so a queued offline tick or Done still lands. The Done and assessment screens are gated on the *session's owner*, not the query, because the offline client navigates to a bare `/done/{id}`.
+- Fixed two pre-existing bugs found on the way: `history_card` resolved its own tab from the row it was checking, and the Settings HTMX swap left a stale tab strip.
+- 3326 tests, 135 Playwright, 93% coverage.
+
+
 ### prp-10 — polish (2026-09-07)
 - Son-mode UX pass on Today, Done and History (bigger type, "Not today" instead of failure-framed copy, a derived new-badge line, ≤300ms tick animation respecting `prefers-reduced-motion`); a real `youth_safe` filter on badges (not just a comment).
 - Seven computed badges (never stored): first session, 3/7-streak, 10/25 sessions, 4-week prelude, challenge met.

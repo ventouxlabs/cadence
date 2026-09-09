@@ -15,6 +15,10 @@
   </label>
 </div>
 {% endmacro %}
+{# Whether this form asks about the son at all (D-260). Setup always does: its whole job is to
+   record his age so his rules exist, and hiding a person is a decision you take about a household
+   that is already running, not about one that has not started. #}
+{% set show_son = mode == 'setup' or form.son_enabled %}
 <form id="settings-form" class="settings" method="post" action="{{ action }}"
       hx-post="{{ action }}" hx-target="#settings-form" hx-swap="outerHTML">
 
@@ -24,6 +28,23 @@
   <p class="form-error" role="alert" data-form-error>⚠ {{ form_error }}</p>
   {% endif %}
 
+  {% if mode == 'settings' %}
+  {# Settings only, following `bodyweight_kg` below: the one-form rule (PRP-03) is about controls
+     that mean the same thing on both screens, and this one does not. Offering to hide the son on
+     the screen whose single required field is his age would be asking two contradictory questions
+     at once (D-266). #}
+  <section class="card" aria-labelledby="son-head">
+    <h2 class="card-head" id="son-head">Include {{ son.display_name|lower }}</h2>
+    {{ toggle("son_enabled", form.son_enabled, "Include " ~ son.display_name) }}
+    <p class="card-note" data-son-note>
+      Off shows you your own screens only. Nothing of {{ son.display_name|lower }}'s is deleted —
+      his plan, his history and his check-ins stay exactly as they are, and turning this back on
+      brings them back unchanged.
+    </p>
+  </section>
+  {% endif %}
+
+  {% if show_son %}
   <section class="card" aria-labelledby="age-head">
     <h2 class="card-head" id="age-head">{{ son.display_name }}'s age</h2>
     <div class="field-row">
@@ -51,6 +72,7 @@
     <p class="card-note" id="age-help">Until this is set he trains on the strictest rules.</p>
     {% endif %}
   </section>
+  {% endif %}
 
   <section class="card" aria-labelledby="kit-head">
     <h2 class="card-head" id="kit-head">Equipment</h2>
@@ -123,6 +145,10 @@
     <p class="card-note">Without one, the dead hang is recorded as unavailable rather than missed.</p>
   </section>
 
+  {# Hidden with him, not switched off with him: the stored value is left exactly as it was, so a
+     household that turns him back on finds the answer it gave (D-261). A hidden profile produces
+     no new sessions, so there is nothing for the setting to govern in the meantime. #}
+  {% if show_son %}
   <section class="card" aria-labelledby="garmin-head">
     <h2 class="card-head" id="garmin-head">Push {{ son.display_name|lower }}'s sessions to Garmin</h2>
     {{ toggle("push_son_to_garmin", form.push_son_to_garmin, "Push his sessions to Garmin") }}
@@ -132,6 +158,7 @@
       yours, named with his.
     </p>
   </section>
+  {% endif %}
 
   <section class="card" aria-labelledby="unit-head">
     <h2 class="card-head" id="unit-head">Show weights in</h2>
@@ -178,6 +205,7 @@
     {% with field = "person_me", message = errors.get("person_me") %}
       {% include "partials/field_error.html" %}
     {% endwith %}
+    {% if show_son %}
     <div class="field-row">
       <label class="person-label" for="person_son">{{ son.display_name }}</label>
       <input class="input" type="text" id="person_son" name="person_son" value="{{ form.person_son }}" maxlength="32">
@@ -185,6 +213,7 @@
     {% with field = "person_son", message = errors.get("person_son") %}
       {% include "partials/field_error.html" %}
     {% endwith %}
+    {% endif %}
     <p class="card-note">Blank stays blank — Cadence never guesses a slug from a name.</p>
   </section>
 

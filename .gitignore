@@ -45,3 +45,6 @@ data/
 # coverage shards
 .coverage.*
 .shots/
+
+# codemap scan reports
+.reports/

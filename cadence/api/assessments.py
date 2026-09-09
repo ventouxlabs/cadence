@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel import Session
 
 from cadence.api.envelope import err, ok
+from cadence.api.gates import refuse_hidden
 from cadence.bilan import assessments as bilan
 from cadence.bilan import service
 from cadence.bilan.gaps import BODY_COMP, ThresholdError
@@ -48,7 +49,15 @@ def get_assessments(
     db: Annotated[Session, Depends(get_session)],
     profile: Annotated[str | None, Query()] = None,
 ) -> Any:
-    """The latest battery, the gaps it exposes and the challenges standing against them."""
+    """The latest battery, the gaps it exposes and the challenges standing against them.
+
+    Solo mode gates the **read** and not the ``POST`` below it (D-265). Recording a battery is a
+    write, no screen can reach it while the son is hidden, and the offline client never queues one
+    - so refusing it would buy nothing and put a toggle in front of somebody's data.
+    """
+    hidden = refuse_hidden(db, profile)
+    if hidden is not None:
+        return hidden
     person = resolve_profile(db, profile)
     if person is None:
         return _refuse(f"unknown profile {profile!r}", 404)
