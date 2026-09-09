@@ -95,13 +95,32 @@ finally:
 # the directory itself is 0700 too (D-201).
 umask 077
 
-mkdir -p "$OUT_DIR"
+mkdir -p "$OUT_DIR" 2>/dev/null || true
+# Refuse *before* doing any work if the snapshot cannot land, and say how to run it properly.
+# On VM-201 `data/` belongs to the container's uid 10001 (D-162), so running this from the host
+# used to reach the `chmod` below, die under `set -e`, and print a permissions warning - leaving
+# an operator who had just "taken a backup" with no backup and a rollback point that does not
+# exist. A backup tool must never fail in a way that reads like a warning (D-277).
+if [[ ! -d "$OUT_DIR" ]] || [[ ! -w "$OUT_DIR" ]]; then
+  echo "backup: cannot write to '$OUT_DIR' - no snapshot was taken." >&2
+  echo "backup: on the VM, data/ is owned by the container's user, so run it in the container:" >&2
+  echo "backup:   docker compose exec -T cadence ./scripts/backup.sh" >&2
+  exit 4
+fi
 # Explicit, because the umask only governs directories *this* script creates and on VM-201 it
 # does not create this one: scripts/deploy.sh runs `mkdir -p data/backups` on every deploy, with
 # the deploying user's umask, which leaves it 0755. Without this line the snapshots would be
 # 0600 inside a directory anyone could list. Not fatal on its own - the files are what matter -
 # but the point is that the directory's mode must not depend on who got there first.
-chmod 700 "$OUT_DIR"
+#
+# Only when we own it: a directory we can write but not chmod still takes a 0600 snapshot, and
+# losing the backup over the mode of its parent would be the same mistake in the other
+# direction. Warn, keep the backup.
+if [[ -O "$OUT_DIR" ]]; then
+  chmod 700 "$OUT_DIR"
+elif [[ "$(stat -c %a "$OUT_DIR" 2>/dev/null || echo 700)" != "700" ]]; then
+  echo "backup: '$OUT_DIR' is not mine to chmod; snapshots are still 0600 but the directory is listable" >&2
+fi
 
 OUT="$OUT_DIR/cadence-$(date +%Y%m%d-%H%M).db"
 

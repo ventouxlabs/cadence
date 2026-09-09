@@ -315,3 +315,39 @@ def test_backup_still_accepts_an_ordinary_path(tmp_path: Path) -> None:
 
     result = _run(db, backup_dir=str(tmp_path / "backups-2"))
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_backup_refuses_an_unwritable_output_directory_instead_of_half_failing(tmp_path: Path) -> None:
+    """The D-277 trap: on the VM ``data/`` belongs to the container's uid, so a host run used to
+    reach ``chmod``, die under ``set -e``, and print what looked like a permissions warning —
+    leaving an operator who had just "taken a backup" with no backup at all. It must refuse up
+    front, name the container invocation, and write nothing."""
+    db = tmp_path / "cadence.db"
+    sqlite3.connect(db).close()
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o500)  # readable and traversable, not writable — what a foreign-owned dir looks like
+    try:
+        result = _run(db, backup_dir=str(locked))
+        assert result.returncode == 4, result.stderr
+        assert "no snapshot was taken" in result.stderr
+        assert "docker compose exec" in result.stderr, "must name the invocation that works"
+        assert list(locked.glob("*.db")) == [], "refused, so nothing may be written"
+    finally:
+        locked.chmod(0o700)
+
+
+def test_backup_still_succeeds_when_the_directory_is_not_ours_to_chmod(tmp_path: Path) -> None:
+    """The other direction: a directory we can write but not re-mode still gets its snapshot.
+    Losing the backup over the *parent's* mode would be the same mistake inverted — the files
+    are 0600 either way."""
+    db = tmp_path / "cadence.db"
+    sqlite3.connect(db).close()
+    out = tmp_path / "backups"
+    out.mkdir()
+    out.chmod(0o755)  # writable by us, but the wrong mode
+    result = _run(db, backup_dir=str(out))
+    assert result.returncode == 0, result.stderr
+    snapshots = list(out.glob("cadence-*.db"))
+    assert len(snapshots) == 1, "the snapshot must still be taken"
+    assert snapshots[0].stat().st_mode & 0o077 == 0, "and it must still be 0600"
