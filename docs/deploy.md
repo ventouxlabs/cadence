@@ -176,6 +176,25 @@ the release touches the schema:
 ssh vm-201 'cd /opt/cadence && ./scripts/backup.sh'
 ```
 
+### Changing a secret on a running install
+
+**`docker compose restart` does not re-read `.env`.** Compose bakes `env_file` into the
+container when it is *created*; `restart` restarts the process inside the existing container
+with the environment it already had. Editing `VITALFORGE_TOKEN` or `OMNIROUTE_KEY` and then
+restarting therefore appears to succeed and changes nothing — `/api/health` still reports
+`"configured": false`, and the only visible symptom is that the thing you just configured
+still behaves as unconfigured. Recreate instead:
+
+```bash
+cd ~/docker/cadence
+${EDITOR:-nano} .env
+docker compose up -d          # recreates the container; restart would not
+curl -s http://100.74.76.39:8090/api/health   # expect "configured": true
+```
+
+This bites only on the *later* edit. The first-deploy flow in §2 writes `.env` before the
+container exists, and `scripts/deploy.sh` uses `up -d`, so neither path hits it (D-258).
+
 ### Log locations
 
 | What | Where |
