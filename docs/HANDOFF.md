@@ -2,6 +2,30 @@
 
 Written at the close of PRP-10. Read this before touching anything.
 
+> ## Current state — 2026-09-09
+>
+> **It is built, deployed, and running.** Nothing below is a plan any more.
+>
+> | | |
+> |---|---|
+> | Live at | `https://cadence.grepon.cc` (valid cert, ~100 ms) |
+> | Running on | VM-201 (`knowledge`), `~/docker/cadence`, container healthy, `restart: unless-stopped` |
+> | Published on | `${CADENCE_BIND_ADDR}:8090` = the **Tailscale** address; the LAN cannot reach it (D-257c) |
+> | Both integrations | **Connected.** VitalForge reads real body-comp and readiness; OmniRoute sees 1374 models |
+> | Write-back | **Complete.** The VitalForge endpoint is merged (PR #42) and live — verified by probe (D-278) |
+> | Backups | Nightly 03:17 cron, in-container, verified |
+> | Repo | `ventouxlabs/cadence`, 11 PRPs + solo mode, CI green, 3328 tests / 93% coverage |
+>
+> **Two things differ from what the rest of this document assumes.** The install lives at
+> `~/docker/cadence`, not `/opt/cadence` — the host's own convention, matching
+> `~/docker/vitalforge` (D-257a). And **the son is currently hidden**: `son_enabled` is off, so
+> the tabs read just "Me". None of his data was deleted — his program, all 16 planned sessions
+> and his session are intact, and one toggle in Settings brings him back exactly as he was.
+> Read "Day one" with that in mind.
+>
+> **The only thing left for JD:** upload `docs/assets/social-preview.png` at GitHub →
+> Settings → General → Social preview. There is no API for it.
+
 ## What Cadence is
 
 Cadence is a self-hosted daily workout app for JD and his son: open it, see today's workout as a plain checklist, tick each exercise, hit Done, and the session shows up in VitalForge and, from there, in Garmin Connect as a strength-training activity. It runs as one FastAPI process serving both the HTML UI (Jinja + HTMX, offline-capable PWA) and a JSON API, with a rolling 4-week program built from a data-driven exercise library and youth rules enforced by a validator, not just by convention. Everything is designed around one constraint: usable one-handed, on the floor, by a kid, in under 10 seconds per exercise.
@@ -160,8 +184,13 @@ make smoke BASE=https://cadence.grepon.cc
 
 ## Day one
 
+> **As deployed, steps 1 and 2 are already done** and the son is hidden (`son_enabled` off), so
+> step 3's `?profile=son` and the son half of step 4 do not apply until you turn him back on in
+> Settings. Everything else stands. Kept in full because it is the procedure for a fresh install,
+> and for the day he joins.
+
 1. **Run setup.** Visit `/setup` (or just `/` on a fresh, unseeded install — it redirects until `setup_complete`). Fill in equipment, weights available, days per week, session length.
-2. **Set the son's age.** Same `/setup` screen — his age drives which youth band (under-10, 10–13, 14–17) his program uses; until it's set he gets the strictest band by default. Editable later at `/settings`.
+2. **Set the son's age.** Same `/setup` screen — his age drives which youth band (under-10, 10–13, 14–17) his program uses; until it's set he gets the strictest band by default. Editable later at `/settings`. *(Only relevant once `son_enabled` is on; while he is hidden the field is not shown.)*
 3. **Do the baseline assessment.** Visit `/assess?profile=son` (and `/assess?profile=me` for JD) and run the six-test battery: push-up max, dead hang, plank, wall-angel reach, goblet squat quality (self-rated), farmer-carry time. This seeds the gap/challenge system.
 4. **Do the first session.** Visit `/today?profile=me`, `/today?profile=son`, or `/today?profile=together` for both on one screen. Tick rows, use the felt toggle once all rows are done, hit Done.
 5. **Check it landed.** The Done screen (`/done/{session_id}`) shows the sync status line — `synced ✓`, `will sync`, or a retry-with-reason line. Then confirm in VitalForge (the person's page under `/p/{slug}/`) and, if `push_to_garmin` was on for that session, in Garmin Connect as a new strength-training activity.
@@ -191,7 +220,8 @@ The module map, from `docs/architecture.md` §2. French names for the project, s
 - **Generated workouts are stored but not auto-scheduled** (PRP-08). `/api/generate/accept` writes the workout to the DB; nothing wires it into a profile's rolling plan automatically. Assigning it to a day is the "use for [day type]" adoption flow in PRP-08/PRP-10, which is manual.
 - **The son's readiness nudge is permanently null.** The deployment holds one Garmin credential (the parent's), and the son has no Garmin account, so VitalForge's readiness endpoint returns `insufficient_data` for him forever (`docs/vitalforge-contract.md` §2.3, D-069). The nudge renders as "not available" rather than erroring or coercing to a number — this is by design, not a bug to fix.
 - **The son's body-composition gap check can't fire in practice.** Autoregulation's `body_comp` gap rule reads a derived `muscle_pct` series that only exists for whichever profile has real Garmin body-composition data — i.e., never the son's (D-219d/D-220).
-- **The VitalForge write-back endpoint is not yet deployed to VM-201's VitalForge.** Until `cadence/activity-endpoint` is reviewed and merged into VitalForge's real branches (see above), every session write-back gets a 404 from VitalForge, which Cadence reads as "pending" and displays as "will sync" rather than a hard failure (D-137, D-207). This is expected and does not block using Cadence.
+- ~~The VitalForge write-back endpoint is not yet deployed.~~ **Resolved 2026-09-09** — merged as PR #42 and live on VM-201, verified by probe (D-278). Write-back works end to end. The one path still unproven by any automated check is the last hop: a real session producing a real activity in Garmin Connect, because that ends in an irreversible write to JD's account. Do one workout and confirm it appears.
+- **The son is hidden right now** (`son_enabled` off, D-260..D-276). His data is untouched and one Settings toggle restores it. While hidden, his four-weekly retest is not queued and his sessions are not created — he simply produces nothing new (D-270).
 - **No authentication.** Anything that can reach `cadence.grepon.cc` can read both profiles and write sessions (D-009). The Tailscale boundary plus an optional NPM access list is the only guard shipped.
 - **A session with no warm-up row can never earn the warm-up badge** (D-231). `prelude-4-weeks` requires each qualifying session to carry at least one prelude row, because "every prelude row is ticked" is otherwise trivially true of a session with none. Every session the program engine builds has a prelude (D-051), so this only bites an imported or hand-written workout that dropped it — and there the badge staying unearned is the honest answer, not a bug.
 - **The "challenge met" badge shows no date** (D-232). The `challenge` table records `baseline_on`, `due_on` and `status`, but nothing saying when the status became `met`, so the badge reads "Challenge met · earned" rather than naming a day. **Change:** add a `met_on` column in `cadence/bilan/tables.py` and set it where the status flips; the badge reads it if it is there.
