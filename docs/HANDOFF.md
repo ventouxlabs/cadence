@@ -58,7 +58,16 @@ These are defaults chosen without asking JD. Each entry below is decision · why
 
 ## The VitalForge branch to review
 
-The Garmin write-back endpoint lives on a branch in the sibling VitalForge checkout, **not** in this repo: `../vitalforge`, branch `cadence/activity-endpoint`, cut from `fix/a6-review-followups` (D-020 — that's the tree the contract's citations and the `should_attempt_garmin_push` helper live in). It has never been pushed to `origin` (D-005) — JD reviews and rebases it himself before it touches his real VitalForge remote.
+> **Done — merged and live as of 2026-09-09.** JD reviewed and merged it as PR #42, with two
+> follow-up fixes on top (`cb529e6` normalising non-calendar ISO dates and pinning the pushed
+> activity name; `8626670` making the activity-name lookup total). The endpoint is on VitalForge
+> `main` and running on VM-201: `POST /p/{slug}/api/activity` answers `401` unauthenticated
+> rather than `404`, and an authenticated store-only probe from Cadence's container returned
+> `202` with `garmin_status: "skipped"`. **The write-back path is complete end to end.** The rest
+> of this section is kept as the record of what was handed over; the branch names below are
+> historical.
+
+The Garmin write-back endpoint was developed on a branch in the sibling VitalForge checkout, **not** in this repo: `../vitalforge`, branch `cadence/activity-endpoint`, cut from `fix/a6-review-followups` (D-020 — that's the tree the contract's citations and the `should_attempt_garmin_push` helper live in). It was deliberately never pushed by the build (D-005) — JD reviewed and merged it himself.
 
 It adds `POST /p/{slug}/api/activity`: given a completed Cadence session, it stores it in a new `strength_sessions` table and creates a `strength_training` activity in Garmin via `garminconnect`'s `create_manual_activity`, with a best-effort per-exercise-set enhancement via `set_activity_exercise_sets`. It's idempotent on `session_id` — a repeat POST never creates a second Garmin activity — and refuses (409) a push for a person who isn't the Garmin-credential person, unless the body explicitly carries `garmin_target: "credential_person"` (the D-015 son-push path). It also adds two read routes: `GET /p/{slug}/api/activity/{session_id}` and `GET /p/{slug}/api/strength-sessions`.
 
