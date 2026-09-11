@@ -57,6 +57,10 @@ class Challenge(SQLModel, table=True):
     baseline_on: str
     due_on: str
     status: str = Field(default=ACTIVE)
+    #: The day the retest reached the target, set where ``status`` becomes ``met`` (D-232).
+    #: Null on a row written before this column existed, and on any row not yet met - so every
+    #: reader treats "met without a day" as ordinary rather than as a broken row.
+    met_on: str | None = Field(default=None)
     # The ``WorkoutRowSpec`` of section 7.7 in the shape ``materialise_rows`` produces, plus
     # ``{"frequency": n, "day_types": [...]}``. Null for ``body_comp``, which inserts no row.
     row_json: str | None = Field(default=None)

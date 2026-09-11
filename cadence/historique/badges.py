@@ -22,6 +22,7 @@ none, and four weeks of prelude-less imported workouts would otherwise earn the 
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -30,9 +31,11 @@ from sqlmodel import Session
 
 from cadence.historique.clock import local_date, week_start
 from cadence.historique.detail import spec_index
-from cadence.historique.queries import completion_threshold, has_table
+from cadence.historique.queries import completion_threshold, has_column, has_table
 from cadence.historique.scorecard import streak_milestones
 from cadence.profils.tables import Profile
+
+logger = logging.getLogger(__name__)
 
 YOUTH = "youth"
 
@@ -107,6 +110,16 @@ ORDER BY s.finished_at, r.position
 
 _MET_CHALLENGE_SQL = """
 SELECT COUNT(*) AS met FROM challenge WHERE profile_id = :profile_id AND status = 'met'
+"""
+
+# Every dated row, not ``MIN(met_on)``. The badge's qualifying day is the *first* challenge met,
+# the same "when did this start being true" the other six answer - but SQLite's ``MIN`` is a
+# string comparison, so one unparseable value sorting below a real one would win the aggregate
+# and cost the badge a date it genuinely has. Picking the earliest of the values that parse
+# keeps a junk row from outvoting a good one. A household has a handful of these.
+_MET_CHALLENGE_DAY_SQL = """
+SELECT met_on AS day FROM challenge
+WHERE profile_id = :profile_id AND status = 'met' AND met_on IS NOT NULL
 """
 
 
@@ -208,12 +221,28 @@ def prelude_streak_day(finished: list[_Finished]) -> date | None:
     return None
 
 
-def _met_challenge(db: Session, profile_id: str) -> bool:
-    """Whether any challenge is ``met``. Tolerates a database predating PRP-07's table."""
+def _met_challenge(db: Session, profile_id: str) -> tuple[bool, date | None]:
+    """Whether any challenge is ``met``, and the day the first one was.
+
+    Tolerates a database predating PRP-07's table, and one predating D-232's ``met_on`` column:
+    the earned/not-earned half is asked of ``status`` alone, so a missing column costs the badge
+    its date and never its truth. A ``met_on`` this build cannot parse is dropped for the same
+    reason - an unreadable day is no day, not an unearned badge.
+    """
     if not has_table(db, "challenge"):
-        return False
+        return False, None
     row = db.execute(text(_MET_CHALLENGE_SQL), {"profile_id": profile_id}).first()
-    return row is not None and int(row._mapping["met"] or 0) > 0
+    earned = row is not None and int(row._mapping["met"] or 0) > 0
+    if not earned or not has_column(db, "challenge", "met_on"):
+        return earned, None
+    days: list[date] = []
+    for row in db.execute(text(_MET_CHALLENGE_DAY_SQL), {"profile_id": profile_id}).all():
+        raw = row._mapping["day"]
+        try:
+            days.append(date.fromisoformat(str(raw)))
+        except ValueError:
+            logger.warning("challenge.met_on %r is not an ISO date; ignoring it for the badge", raw)
+    return True, min(days) if days else None
 
 
 def badges_for(session: Session, profile_id: str) -> list[Badge]:
@@ -227,8 +256,10 @@ def badges_for(session: Session, profile_id: str) -> list[Badge]:
     for badges, and the other two — the son's Done screen through ``badges_earned_on``, and the
     caption route through ``badge_by_id`` — went straight past a filter that lived on the column.
 
-    ``challenge-met`` is earned without a date: the ``challenge`` table records no met-on day,
-    and a guessed one is worse (D-232).
+    ``challenge-met`` names the day the **first** challenge was met, read from ``challenge.met_on``
+    (D-232). It still degrades to a dateless "earned" for two ordinary cases: a challenge closed
+    before that column existed, and a database that predates it altogether. The caption already
+    had that branch, because D-232 shipped as the dateless form.
 
     **A badge is not monotonic, and cannot be** (D-248). "Complete" is judged against the band
     threshold the profile carries *now* (``completion_threshold``), and that threshold rises as
@@ -247,15 +278,17 @@ def badges_for(session: Session, profile_id: str) -> list[Badge]:
     finished = _finished_sessions(session, profile_id)
     streak, reached = streak_milestones(session, profile_id, STREAK_LENGTHS)
     complete_days = [item.day for item in finished if item.complete]
+    challenge_met, challenge_day = _met_challenge(session, profile_id)
 
     earned_on: dict[str, date | None] = {
         "first-session": complete_days[0] if complete_days else None,
         "prelude-4-weeks": prelude_streak_day(finished),
+        "challenge-met": challenge_day,
     }
     won: dict[str, bool] = {
         "first-session": bool(complete_days),
         "prelude-4-weeks": earned_on["prelude-4-weeks"] is not None,
-        "challenge-met": _met_challenge(session, profile_id),
+        "challenge-met": challenge_met,
     }
     for length in STREAK_LENGTHS:
         key = f"streak-{length}"
@@ -294,7 +327,10 @@ def badges_earned_on(session: Session, profile_id: str, day: date | None) -> lis
 
     Derived like everything else here: a badge earned on the day a session finished was earned by
     that session, so "new" needs no record of what the profile held yesterday. A badge with no
-    date (``challenge-met``, D-232) is never new, because there is nothing to compare.
+    date is never new, because there is nothing to compare - which now includes only a
+    ``challenge-met`` whose row predates D-232's ``met_on``. A dated one can surface here, and
+    should: a retest that closes a challenge on the day of a session is exactly the "new" this
+    asks about.
     """
     if day is None:
         return []

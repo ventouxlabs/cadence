@@ -272,11 +272,12 @@ def test_challenge_met_badge(db_session: Session, profile_id: str) -> None:
     assert ids(db_session, profile_id)["challenge-met"] is True
 
 
-def test_challenge_met_is_earned_without_a_date(db_session: Session, profile_id: str) -> None:
-    """D-232: the `challenge` table records no met-on day, so the badge names none.
+def test_challenge_met_without_met_on_still_names_no_date(db_session: Session, profile_id: str) -> None:
+    """D-232 the other way round: a row closed before `met_on` existed still invents nothing.
 
-    The caption is the thing a person reads, so it is asserted too — an `earned_on` of `None`
-    that still rendered "earned 1 Jan" would be the guess D-232 exists to refuse.
+    This is what every already-met challenge on the deployed install looks like — `status = met`,
+    `met_on` null — and it has to keep reading "earned" with no day rather than guessing one or
+    dropping the badge. The caption is asserted because it is the thing a person reads.
     """
     db_session.add(
         Challenge(
@@ -298,6 +299,139 @@ def test_challenge_met_is_earned_without_a_date(db_session: Session, profile_id:
     assert badge.earned_on is None, f"a met-on date was invented: {badge.earned_on}"
     assert badge.caption == "Challenge met · earned", badge.caption
     assert "earned " not in badge.caption, f"the caption names a day it cannot know: {badge.caption}"
+
+
+def test_challenge_met_names_the_day_it_was_met(db_session: Session, profile_id: str) -> None:
+    """D-232 resolved: `met_on` is set, so the badge reads it instead of shrugging."""
+    db_session.add(
+        Challenge(
+            id="ch-4",
+            profile_id=profile_id,
+            name="Dead hang 60 s",
+            test_id="dead_hang_s",
+            target_value=60.0,
+            unit="s",
+            baseline_on="2026-03-01",
+            due_on="2026-04-01",
+            status=MET,
+            met_on="2026-03-22",
+        )
+    )
+    db_session.commit()
+
+    badge = next(item for item in badges_for(db_session, profile_id) if item.id == "challenge-met")
+    assert badge.earned is True
+    assert badge.earned_on == date(2026, 3, 22)
+    assert badge.caption == "Challenge met · earned 22 Mar", badge.caption
+
+
+def test_challenge_met_takes_the_first_day_of_several(db_session: Session, profile_id: str) -> None:
+    """The qualifying day is when the badge *started* being true, as it is for the other six.
+
+    A dateless row beside a dated one must not win: `MIN` skips nulls, so the mixed history the
+    deployed install will actually have — old met challenges plus new ones — still names a day.
+    """
+    for index, met_on in enumerate((None, "2026-05-04", "2026-03-22"), start=5):
+        db_session.add(
+            Challenge(
+                id=f"ch-{index}",
+                profile_id=profile_id,
+                name="Dead hang 60 s",
+                test_id="dead_hang_s",
+                target_value=60.0,
+                unit="s",
+                baseline_on="2026-03-01",
+                due_on="2026-04-01",
+                status=MET,
+                met_on=met_on,
+            )
+        )
+    db_session.commit()
+
+    badge = next(item for item in badges_for(db_session, profile_id) if item.id == "challenge-met")
+    assert badge.earned_on == date(2026, 3, 22)
+
+
+def test_challenge_met_survives_an_unparseable_met_on(db_session: Session, profile_id: str) -> None:
+    """A day this build cannot read is no day — never an unearned badge, never a crash."""
+    db_session.add(
+        Challenge(
+            id="ch-8",
+            profile_id=profile_id,
+            name="Dead hang 60 s",
+            test_id="dead_hang_s",
+            target_value=60.0,
+            unit="s",
+            baseline_on="2026-03-01",
+            due_on="2026-04-01",
+            status=MET,
+            met_on="last Tuesday",
+        )
+    )
+    db_session.commit()
+
+    badge = next(item for item in badges_for(db_session, profile_id) if item.id == "challenge-met")
+    assert badge.earned is True
+    assert badge.earned_on is None
+    assert badge.caption == "Challenge met · earned"
+
+
+def test_an_unparseable_met_on_does_not_outvote_a_real_one(db_session: Session, profile_id: str) -> None:
+    """The reason the earliest day is picked in Python and not by SQL's `MIN`.
+
+    `MIN(met_on)` compares strings, so a junk value that happens to sort below a real ISO date —
+    `"0000-not-a-day"` does — would win the aggregate and cost the badge a date it genuinely has.
+    Parsing first and taking the minimum of what survives makes the junk row unable to vote.
+    """
+    for index, met_on in enumerate(("0000-not-a-day", "2026-03-22"), start=10):
+        db_session.add(
+            Challenge(
+                id=f"ch-{index}",
+                profile_id=profile_id,
+                name="Dead hang 60 s",
+                test_id="dead_hang_s",
+                target_value=60.0,
+                unit="s",
+                baseline_on="2026-03-01",
+                due_on="2026-04-01",
+                status=MET,
+                met_on=met_on,
+            )
+        )
+    db_session.commit()
+
+    badge = next(item for item in badges_for(db_session, profile_id) if item.id == "challenge-met")
+    assert badge.earned_on == date(2026, 3, 22), "a junk met_on sorted below the real one and won"
+
+
+def test_challenge_met_tolerates_a_database_without_the_column(db_session: Session, profile_id: str) -> None:
+    """The deployed install's shape: `challenge` exists, `met_on` does not (no migration runner).
+
+    Dropping the column is the only honest way to reproduce it — `has_column` is what stands
+    between a pre-D-232 database and a `no such column: met_on` on every History render.
+    """
+    db_session.add(
+        Challenge(
+            id="ch-9",
+            profile_id=profile_id,
+            name="Dead hang 60 s",
+            test_id="dead_hang_s",
+            target_value=60.0,
+            unit="s",
+            baseline_on="2026-03-01",
+            due_on="2026-04-01",
+            status=MET,
+            met_on="2026-03-22",
+        )
+    )
+    db_session.commit()
+    db_session.execute(text("ALTER TABLE challenge DROP COLUMN met_on"))
+    db_session.commit()
+
+    badge = next(item for item in badges_for(db_session, profile_id) if item.id == "challenge-met")
+    assert badge.earned is True, "the badge was lost with its date"
+    assert badge.earned_on is None
+    assert badge.caption == "Challenge met · earned"
 
 
 def test_an_active_challenge_earns_nothing(db_session: Session, profile_id: str) -> None:
