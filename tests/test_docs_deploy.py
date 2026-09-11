@@ -214,3 +214,42 @@ def test_dockerignore_excludes_every_dotenv_form() -> None:
     lines = {line.strip() for line in (REPO / ".dockerignore").read_text().splitlines()}
     assert ".env" in lines
     assert ".env.*" in lines
+
+
+# ------------------------------------------------------------------- D-280: the bind-address trap
+
+#: Both runbooks confirm a deploy by asking the app for its health. The address that check uses
+#: has to follow `CADENCE_BIND_ADDR`, because §5 narrows it away from the LAN.
+HANDOFF = (REPO / "docs" / "HANDOFF.md").read_text()
+_HEALTH_CURL = re.compile(r"^.*curl[^\n]*/api/health.*$", re.MULTILINE)
+
+
+def test_no_health_check_hardcodes_the_lan_address() -> None:
+    """D-280. `192.168.1.21:8090` refuses once the bind is narrowed, and both docs narrow it.
+
+    The cost of getting this wrong is not a typo: a refused connection arrives at the exact
+    moment an operator is trying to prove the container came up, and reads like one that did not.
+    `docker compose port` asks the publish where it is and is correct under either bind.
+    """
+    for name, text in (("deploy.md", DOC), ("HANDOFF.md", HANDOFF)):
+        checks = _HEALTH_CURL.findall(text)
+        assert checks, f"{name} lost its health check, so this would pass vacuously"
+        for line in checks:
+            assert "192.168.1.21" not in line, f"{name} health-checks an address the bind refuses: {line.strip()}"
+        # A line naming the Tailscale address outright is fine - that one is reachable. What has
+        # to exist is the bind-agnostic form, for the confirmation step a first deploy runs
+        # before anybody knows which address this host ended up on.
+        assert any("docker compose port" in line for line in checks), (
+            f"{name} has no health check that asks the publish where it is: {[line.strip() for line in checks]}"
+        )
+
+
+def test_the_proxy_forward_host_is_read_not_copied() -> None:
+    """D-280. NPM must forward to whatever the publish is bound to, or it 502s a healthy app.
+
+    Asserted as "the row does not name a bare address" rather than "the row names the Tailscale
+    one": the correct value is machine-specific and lives in `.env`, so a document that pins any
+    single address is wrong the moment somebody deploys a second one.
+    """
+    row = next(line for line in DOC.splitlines() if "Forward Hostname" in line)
+    assert "docker compose port" in row, f"the runbook hands NPM an address to copy: {row}"
