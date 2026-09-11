@@ -117,8 +117,15 @@ Then confirm, before touching Nginx Proxy Manager:
 ```bash
 docker compose ps                            # STATUS must say (healthy), not just Up
 docker exec cadence id -u                    # 10001
-curl -s http://192.168.1.21:8090/api/health | jq .
+docker compose port cadence 8000             # the address:port the publish actually landed on
+curl -s "http://$(docker compose port cadence 8000)/api/health" | jq .
 ```
+
+> **Ask the publish where it is rather than assuming the LAN.** The port follows
+> `CADENCE_BIND_ADDR` (§5), and on VM-201 that is the Tailscale address, so a hardcoded
+> `http://192.168.1.21:8090/api/health` **is refused** — which reads like a container that never
+> came up, at exactly the moment you are trying to prove one did. `docker compose port` answers
+> with whatever the mapping really is, on a wide bind and a narrow one alike.
 
 ### Local dry run first
 
@@ -214,13 +221,25 @@ New Proxy Host:
 |---|---|
 | Domain Names | `cadence.grepon.cc` |
 | Scheme | `http` |
-| Forward Hostname / IP | `192.168.1.21` |
+| Forward Hostname / IP | **whatever the publish is bound to** — the host half of `docker compose port cadence 8000`. `192.168.1.21` on a default `0.0.0.0` bind; VM-201's Tailscale address once §5 narrows it |
 | Forward Port | `8090` (the **host** port, not the container's 8000) |
 | Cache Assets | **off** |
 | Block Common Exploits | **on** |
 | Websockets Support | **off** |
 | SSL | request a Let's Encrypt certificate, Force SSL on, HTTP/2 on |
 | Access List | optional, §5 |
+
+**The forward address has to be one the publish is bound to.** §5 narrows the bind from
+`0.0.0.0` to a Tailscale address, and **VM-201 is in that narrowed state** — D-257c records
+`CADENCE_BIND_ADDR=100.74.76.39`, verified there on 2026-09-07, with `192.168.1.21:8090`
+refusing. So this field is not the LAN IP on that host. Setting `CADENCE_BIND_ADDR` and leaving
+this field on the LAN IP is the one ordering that turns a working proxy into a 502 with a
+perfectly healthy container behind it. Do not copy an address from this document into NPM — read
+the live one, which is authoritative in a way a document cannot be:
+
+```bash
+docker compose port cadence 8000     # e.g. 100.74.76.39:8090 - exactly what NPM needs
+```
 
 Advanced tab, one directive:
 
@@ -259,9 +278,12 @@ Guards, in order of preference:
 > The access list applies **at NPM**. A client on the LAN hitting `192.168.1.21:8090` directly
 > bypasses it entirely.
 
-**Closing that gap** is one variable, no file edit. `docker-compose.yml` publishes
-`${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000`, so adding this to `/opt/cadence/.env` and running
-`make deploy` binds the port to the Tailscale interface only:
+**Closing that gap** is one variable, no file edit — and on VM-201 it is **already closed**:
+D-257c records `CADENCE_BIND_ADDR=100.74.76.39` set and verified there on 2026-09-07, with
+`192.168.1.21:8090` refusing and `100.74.76.39:8090` answering. What follows is how it was
+closed, and what a fresh install still has to do. `docker-compose.yml` publishes
+`${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000`, so adding this to `.env` and running `make deploy`
+binds the port to the Tailscale interface only:
 
 ```dotenv
 CADENCE_BIND_ADDR=100.x.y.z    # VM-201's Tailscale address, from `tailscale ip -4`
@@ -272,8 +294,10 @@ Then verify from a non-Tailscale LAN address that `192.168.1.21:8090` is refused
 is what a deploy publishes until somebody sets this — the gap is closed by the operator, not by
 the repo.
 
-Two things not to do. **Do not use `127.0.0.1`**: NPM runs on this host but is containerised and
-forwards to `192.168.1.21:8090`, so loopback-only makes the proxy itself 502. And **do not add a
+Two things not to do. **Do not use `127.0.0.1`**: NPM runs on this host but is containerised, so
+it reaches Cadence over a host interface and never over the host's loopback — a loopback-only
+bind 502s the proxy. Whatever address you do bind, put that same one in NPM's Forward Hostname
+field (§4). And **do not add a
 `ports` entry to `docker-compose.prod.yml`**: compose *appends* `ports` across `-f` files rather
 than overriding them, so the base mapping stays published alongside the new one and the two
 collide on host 8090 (D-206). The address belongs in the base file's single entry or nowhere.

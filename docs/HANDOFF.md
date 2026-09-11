@@ -76,7 +76,7 @@ These are defaults chosen without asking JD. Each entry below is decision · why
 - **D-069 (confirmed, listed for completeness) — the son has no Garmin account.** His sessions live in VitalForge under his own slug and never reach Garmin unless `push_son_to_garmin` is on. Confirmed with JD 2026-09-06, not actually open, but interacts directly with D-015 and D-018 above.
 - **D-090 — `display_unit` (kg/lb) defaults to kg.** Storage is always kilograms; conversion happens in exactly one place (`format_load` in `cadence/web/rendering.py`). **Change:** the Settings screen; nothing else needs to know.
 - **D-161 — Deploy defaults to rsync mode, not git.** Because PRP-05's VitalForge branch is deliberately never pushed (D-005), a git-only deploy can't carry the tree write-back is tested against. **Change:** `make deploy DEPLOY_MODE=git`, once a real remote and branch exist on the VM.
-- **D-206 — The published port binds `0.0.0.0` by default.** Closing the LAN bypass of the NPM access list is one operator step, not shipped by default. **Change:** set `CADENCE_BIND_ADDR` to VM-201's Tailscale address in `/opt/cadence/.env` (see Deploy section below).
+- **D-206 — The published port binds `0.0.0.0` by default.** Closing the LAN bypass of the NPM access list is one operator step, not shipped by default. **Already taken on VM-201:** `CADENCE_BIND_ADDR=100.74.76.39` is set in `~/docker/cadence/.env` and verified (D-257c), so the LAN cannot reach the port. The default in the repo stays `0.0.0.0`, because a Tailscale address is machine-specific and cannot be committed — so a *fresh* install starts wide and closes it the same way. NPM's Forward Hostname must name the same address the bind does, or the proxy 502s (`docs/deploy.md` §4).
 - **D-117 — PWA-only, no native app; TWA wrapper is optional.** Confirmed with JD 2026-09-07. See "Installing as an app" below for the change path.
 - **D-005 — VitalForge branch never pushed.** A deliberate default so JD can review before it touches his real VitalForge remote. **Change:** see the section below.
 
@@ -125,6 +125,18 @@ Four things can only be confirmed against a real Garmin account — nothing in t
 
 Commands below are quoted verbatim from `docs/deploy.md`; that document is the source of truth and owns anything not reproduced here (troubleshooting table, rollback, NPM access-list steps).
 
+> **Two substitutions before you run any of it, both because the live install differs from the
+> document it was written from.** They are named at the top of this file too; they are repeated
+> here because this is where somebody copy-pastes.
+>
+> - **`/opt/cadence` → `~/docker/cadence`.** The host's own convention won (D-257a). The commands
+>   below still say `/opt/cadence` because they are quotes; create and `cd` into
+>   `~/docker/cadence` instead. The deploy script takes it from the environment — see
+>   `docs/deploy.md` §1 for the variable name, which is not a `.env` key.
+> - **The published port is not on the LAN.** `CADENCE_BIND_ADDR=100.74.76.39` — VM-201's
+>   Tailscale address (D-257c) — so `192.168.1.21:8090` refuses, and any health check written
+>   against it fails in a way that reads like a container that never started.
+
 Prerequisites: Docker Engine + Compose plugin on VM-201; an ssh alias `vm-201` with key auth from the workstation; **passwordless sudo** for the deploying user on VM-201 (the deploy runs one `sudo chown` over a non-interactive ssh — a password prompt there hangs it); `rsync` and `jq` on the workstation.
 
 First deploy — order matters, because `env_file: .env` makes Compose refuse to start without it, so the first `make deploy` is expected to fail at `up`:
@@ -169,8 +181,12 @@ Confirm before touching Nginx Proxy Manager:
 ```bash
 docker compose ps                            # STATUS must say (healthy), not just Up
 docker exec cadence id -u                    # 10001
-curl -s http://192.168.1.21:8090/api/health | jq .
+docker compose port cadence 8000             # the address:port the publish actually landed on
+curl -s "http://$(docker compose port cadence 8000)/api/health" | jq .
 ```
+
+`docker compose port` rather than a hardcoded host, for the reason in the callout above: the
+publish follows `CADENCE_BIND_ADDR`, and asking it where it is works on both binds.
 
 Routine deploys after that:
 
