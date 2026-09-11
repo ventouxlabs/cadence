@@ -93,13 +93,21 @@ def all_for(db: Session, profile_id: str) -> list[Challenge]:
 
 
 def close_met(db: Session, profile_id: str, results: list[Assessment]) -> list[Challenge]:
-    """Mark every active challenge a retest has reached (section 7.7)."""
-    reached = {row.test_id: float(row.value) for row in results if row.value is not None}
+    """Mark every active challenge a retest has reached (section 7.7).
+
+    ``met_on`` is the ``recorded_on`` of the measurement that reached the target, not today
+    (D-232). A battery backdated to the day it was actually performed closes its challenges on
+    that day too, which is the same reading ``recorded_on`` already gets everywhere else - and
+    the alternative, stamping the day the row happened to be written, is the guess D-232 was
+    holding out for a real answer rather than accept.
+    """
+    reached = {row.test_id: (float(row.value), row.recorded_on) for row in results if row.value is not None}
     closed: list[Challenge] = []
     for challenge in active_for(db, profile_id):
-        value = reached.get(challenge.test_id)
-        if value is not None and value >= challenge.target_value:
+        measurement = reached.get(challenge.test_id)
+        if measurement is not None and measurement[0] >= challenge.target_value:
             challenge.status = MET
+            challenge.met_on = measurement[1]
             db.add(challenge)
             closed.append(challenge)
     return closed

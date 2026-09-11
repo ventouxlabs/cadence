@@ -136,6 +136,26 @@ def has_table(db: Session, name: str) -> bool:
         return False
 
 
+def has_column(db: Session, table: str, column: str) -> bool:
+    """Whether a column added after a database was created is present in it.
+
+    The same shape as ``has_table`` and for the same reason: there is no migration runner, so a
+    column this build declares is created by ``SQLModel.metadata.create_all`` on a fresh database
+    and simply absent on one that predates it. A reader that asks first degrades to "no value"
+    instead of raising ``no such column`` at the deployed install (D-232).
+    """
+    try:
+        inspector = inspect(db.get_bind())
+        if not inspector.has_table(table):
+            return False
+        return any(entry["name"] == column for entry in inspector.get_columns(table))
+    except SQLAlchemyError:  # pragma: no cover - only on a connection already broken
+        logger.warning(
+            "could not check whether %r.%r exists; treating it as absent", table, column, exc_info=True
+        )
+        return False
+
+
 # ``datetime()`` rather than the bare column: SQLite normalises an ISO offset to UTC, and a
 # plain string sort would put "2026-09-07T00:30:00+02:00" after "2026-09-06T22:30:00+00:00"
 # although they are the same instant. Everything this build writes is UTC; a replayed Done from

@@ -349,6 +349,48 @@ def test_challenge_met_on_retest(seeded: Any, db_session: DbSession, library: An
 
     stored = chal.all_for(db_session, PROFILE_ME)
     assert [(item.test_id, item.status) for item in stored] == [("push_up_max", MET)]
+    assert stored[0].met_on == retest.isoformat(), "D-232: the closing day is recorded, not inferred"
+
+
+def test_met_on_is_the_measurement_day_not_the_day_it_was_written(
+    seeded: Any, db_session: DbSession, library: Any
+) -> None:
+    """D-232. A battery entered late closes its challenge on the day the retest happened.
+
+    `save_battery` takes `recorded_on` and `today` separately precisely because they can differ;
+    stamping `today` would file a workout done on Sunday under the Wednesday somebody typed it in.
+    """
+    me = db_session.get(Profile, PROFILE_ME)
+    assert me is not None
+    _save(db_session, me, library, {**ADULT_PASS, "push_up_max": 6.0})
+
+    performed = BASELINE + timedelta(days=28)
+    entered = performed + timedelta(days=3)
+    _save(db_session, me, library, {**ADULT_PASS, "push_up_max": 15.0}, on=performed, today=entered)
+
+    stored = chal.all_for(db_session, PROFILE_ME)
+    assert stored[0].status == MET
+    assert stored[0].met_on == performed.isoformat(), f"stamped the entry day: {stored[0].met_on}"
+
+
+def test_an_unmet_challenge_carries_no_met_on(seeded: Any, db_session: DbSession, library: Any) -> None:
+    """The column is set where the status flips and nowhere else — an active row has no day."""
+    me = db_session.get(Profile, PROFILE_ME)
+    assert me is not None
+    opened = _save(db_session, me, library, {**ADULT_PASS, "push_up_max": 6.0, "dead_hang_s": 10.0}).challenges
+    assert [item.met_on for item in opened] == [None, None]
+
+    # `dead_hang_s` goes unavailable on the retest, so it is not re-derived and stays expired -
+    # the same shape `test_challenge_expires` relies on, and the only way to hold an expired row
+    # still, since a re-derived challenge reuses its natural key.
+    late = BASELINE + timedelta(days=35)
+    _save(db_session, me, library, {**ADULT_PASS, "push_up_max": 6.0}, unavailable=["dead_hang_s"], on=late, today=late)
+
+    stored = {item.test_id: item for item in chal.all_for(db_session, PROFILE_ME)}
+    assert stored["dead_hang_s"].status == EXPIRED
+    assert stored["dead_hang_s"].met_on is None, "an expired challenge was dated as met"
+    assert stored["push_up_max"].status == ACTIVE
+    assert stored["push_up_max"].met_on is None, "an active challenge was dated as met"
 
 
 def test_challenge_expires(seeded: Any, db_session: DbSession, library: Any) -> None:
