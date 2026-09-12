@@ -155,7 +155,16 @@ fi
 
 # uid 10001 is the container user. A bind mount created by compose is root-owned, and the app
 # then fails with `unable to open database file` - the classic first-deploy failure.
-ssh -- "$HOST" "cd '$REMOTE_PATH' && mkdir -p data/backups && chmod 700 data/backups && sudo chown -R $APP_UID:$APP_UID data"
+#
+# All three under sudo, and the chown before the chmod (D-285). The old line was
+# `mkdir -p data/backups && chmod 700 data/backups && sudo chown ...`, with only the chown
+# elevated. On any host that has run once, `data/` already belongs to uid 10001, so the
+# deploying user cannot chmod into it - and `chmod` refuses even when the mode is already
+# correct, because it is not the owner. Under `set -e` that killed the deploy *after* the rsync
+# and *before* `compose up`: new code on disk, old container still serving, and a message that
+# reads like a permissions warning rather than "your deploy did not happen". That is D-277's
+# failure exactly, in the script D-277 did not look at.
+ssh -- "$HOST" "cd '$REMOTE_PATH' && sudo mkdir -p data/backups && sudo chown -R $APP_UID:$APP_UID data && sudo chmod 700 data/backups"
 ssh -- "$HOST" "cd '$REMOTE_PATH' && $COMPOSE up -d $BUILD"
 ssh -- "$HOST" "cd '$REMOTE_PATH' && $COMPOSE ps && $COMPOSE logs --tail 30 cadence"
 

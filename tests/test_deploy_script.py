@@ -186,9 +186,18 @@ def test_ssh_and_rsync_targets_are_after_a_double_dash() -> None:
 
 
 def test_deploy_locks_down_the_backup_directory_it_creates() -> None:
-    """deploy.sh creates data/backups before backup.sh's own umask ever runs (D-201)."""
+    """deploy.sh creates data/backups before backup.sh's own umask ever runs (D-201).
+
+    Asserted as the two things that must be true — the directory is created, and its mode is set
+    to 700 — rather than as the one command string that used to do it. The literal form this
+    pinned was `mkdir -p data/backups && chmod 700 data/backups`, an unelevated chmod that D-285
+    found dying on every host where `data/` already belongs to uid 10001. Pinning the string
+    meant this test passed for the whole life of that bug and would have failed on the fix, which
+    is the wrong way round: a test should describe the requirement, not transcribe the code.
+    """
     body = "\n".join(line for line in TEXT.splitlines() if not line.lstrip().startswith("#"))
-    assert "mkdir -p data/backups && chmod 700 data/backups" in body
+    assert "mkdir -p data/backups" in body, "the deploy no longer creates the backups directory"
+    assert "chmod 700 data/backups" in body, "the backups directory is no longer locked down"
 
 
 def test_neither_variable_accepts_a_leading_dash_or_a_quote(tmp_path: Path) -> None:
@@ -335,3 +344,31 @@ def test_the_refusal_does_not_hardcode_one_host_path(tmp_path) -> None:
     result, _ = _run_against(tmp_path, "missing")
     assert "/home/user/" not in result.stderr, f"the refusal names one operator's home: {result.stderr}"
     assert "docs/deploy.md" in result.stderr, "the refusal does not say where the real value lives"
+
+
+def test_the_data_prep_never_chmods_as_a_user_that_cannot(tmp_path) -> None:
+    """D-285. `data/` belongs to uid 10001 on any host that has run once (D-162).
+
+    A bare `chmod` there fails for the deploying user even when the mode is already correct,
+    because it is not the owner — and under `set -e` that killed the deploy *after* the rsync
+    and *before* `compose up`. New code on disk, old container serving, and a message that reads
+    like a permissions warning. D-277's failure, in the script D-277 did not look at.
+    """
+    result, remote = _run_against(tmp_path, "install")
+    assert result.returncode == 0, result.stderr
+
+    prep = next((line for line in remote.splitlines() if "chown" in line), "")
+    assert prep, "the data-prep step vanished, so this would pass vacuously"
+    assert "&& chmod" not in prep, f"the deploy chmods as the deploying user: {prep}"
+    assert "sudo chmod" in prep, f"the chmod is not elevated: {prep}"
+    assert prep.index("chown") < prep.index("sudo chmod"), (
+        f"the chmod runs before the chown, so it still hits a directory we may not own: {prep}"
+    )
+
+
+def test_the_data_prep_still_hands_the_directory_to_the_container_user(tmp_path) -> None:
+    """The reason the step exists at all: uid 10001 must own `data/`, or the app cannot open it."""
+    _result, remote = _run_against(tmp_path, "install")
+    prep = next((line for line in remote.splitlines() if "chown" in line), "")
+    assert "sudo chown -R 10001:10001 data" in prep, f"the chown lost its target: {prep}"
+    assert "data/backups" in prep, "the backups directory is no longer created by the deploy"
