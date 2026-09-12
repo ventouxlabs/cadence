@@ -405,10 +405,14 @@ def test_an_unparseable_met_on_does_not_outvote_a_real_one(db_session: Session, 
 
 
 def test_challenge_met_tolerates_a_database_without_the_column(db_session: Session, profile_id: str) -> None:
-    """The deployed install's shape: `challenge` exists, `met_on` does not (no migration runner).
+    """A `challenge` table with no `met_on`, which `init_db` no longer leaves behind (D-283).
 
-    Dropping the column is the only honest way to reproduce it — `has_column` is what stands
-    between a pre-D-232 database and a `no such column: met_on` on every History render.
+    **This test is not the deployed-database guarantee, and reading it as one is what let a P1
+    through.** It exercises the badge's raw SQL only. `Challenge` is ORM-mapped, so
+    `select(Challenge)` names every mapped field and the real failure was `active_for` — on the
+    assessment path, nowhere near a badge. `tests/test_db.py` owns that case now; `has_column`
+    survives here because raw SQL that names a column still has to cope with it being absent,
+    for instance mid-migration or against a database this build did not open.
     """
     db_session.add(
         Challenge(
