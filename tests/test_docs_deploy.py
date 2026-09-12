@@ -270,17 +270,18 @@ def _fenced_command_lines(text: str) -> list[str]:
 
 
 def test_no_runnable_command_names_the_default_path_on_this_host(tmp_path=None) -> None:
-    """D-281. The runbook documents VM-201, whose install is not at the script's default.
+    """D-281. Both runbooks document VM-201, whose install is not at the script's default.
 
     Prose may name `/opt/cadence` — it *is* the default, and saying so is the point. A command
     somebody pastes may not, because on this host it targets a directory beside the running app.
     D-280 established that a "substitute this path throughout" note does not count as recording
     the difference; this is that rule, enforced.
     """
-    offenders = [line for line in _fenced_command_lines(DOC) if "/opt/cadence" in line]
-    assert not offenders, "runnable commands still name the default path: " + "; ".join(
-        line.strip() for line in offenders
-    )
+    for name, text in (("deploy.md", DOC), ("HANDOFF.md", HANDOFF)):
+        offenders = [line for line in _fenced_command_lines(text) if "/opt/cadence" in line]
+        assert not offenders, f"{name} still names the default path in a runnable command: " + "; ".join(
+            line.strip() for line in offenders
+        )
 
 
 def test_the_backup_cron_targets_the_install() -> None:
