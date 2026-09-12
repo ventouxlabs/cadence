@@ -1,0 +1,128 @@
+{
+  "assessment": [
+    "id",
+    "profile_id",
+    "recorded_on",
+    "self_rated",
+    "test_id",
+    "unit",
+    "value"
+  ],
+  "challenge": [
+    "baseline_on",
+    "due_on",
+    "id",
+    "name",
+    "profile_id",
+    "row_json",
+    "status",
+    "target_value",
+    "test_id",
+    "unit"
+  ],
+  "exercise": [
+    "created_at",
+    "doc_json",
+    "id",
+    "source"
+  ],
+  "metrics_cache": [
+    "fetched_at",
+    "payload_json",
+    "profile_id",
+    "stale"
+  ],
+  "planned_session": [
+    "day_index",
+    "day_type",
+    "id",
+    "profile_id",
+    "program_id",
+    "rows_json",
+    "status",
+    "week",
+    "workout_id"
+  ],
+  "profile": [
+    "age_band",
+    "age_recorded_on",
+    "age_years",
+    "bodyweight_kg",
+    "display_name",
+    "has_overhead_anchor",
+    "id",
+    "kind",
+    "push_to_garmin",
+    "vitalforge_person"
+  ],
+  "program": [
+    "days_per_week",
+    "id",
+    "profile_id",
+    "session_minutes",
+    "start_date",
+    "status",
+    "template",
+    "weeks"
+  ],
+  "schema_version": [
+    "applied_at",
+    "id",
+    "version"
+  ],
+  "session": [
+    "duration_min",
+    "felt",
+    "finished_at",
+    "id",
+    "notes",
+    "planned_session_id",
+    "profile_id",
+    "readiness_at_start",
+    "started_at",
+    "together_group_id"
+  ],
+  "session_row": [
+    "done",
+    "done_at",
+    "exercise_id",
+    "id",
+    "is_challenge",
+    "load_done_kg",
+    "load_planned_kg",
+    "position",
+    "reps_done",
+    "reps_planned",
+    "seconds_done",
+    "seconds_planned",
+    "session_id",
+    "sets_done",
+    "sets_planned"
+  ],
+  "setting": [
+    "key",
+    "updated_at",
+    "value_json"
+  ],
+  "sync_job": [
+    "attempts",
+    "id",
+    "last_attempt_at",
+    "last_error",
+    "last_status",
+    "next_attempt_at",
+    "payload_json",
+    "remote_ref",
+    "session_id",
+    "status",
+    "target",
+    "target_slug"
+  ],
+  "workout": [
+    "created_at",
+    "doc_json",
+    "id",
+    "source",
+    "target_profile_kind"
+  ]
+}
