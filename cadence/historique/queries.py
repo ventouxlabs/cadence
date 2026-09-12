@@ -150,9 +150,7 @@ def has_column(db: Session, table: str, column: str) -> bool:
             return False
         return any(entry["name"] == column for entry in inspector.get_columns(table))
     except SQLAlchemyError:  # pragma: no cover - only on a connection already broken
-        logger.warning(
-            "could not check whether %r.%r exists; treating it as absent", table, column, exc_info=True
-        )
+        logger.warning("could not check whether %r.%r exists; treating it as absent", table, column, exc_info=True)
         return False
 
 
