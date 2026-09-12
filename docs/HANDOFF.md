@@ -191,6 +191,10 @@ publish follows `CADENCE_BIND_ADDR`, and asking it where it is works on both bin
 Routine deploys after that:
 
 ```bash
+# The install is not at the script's default path, so name it (D-257a, D-281).
+# Absolute — `scripts/deploy.sh` refuses a path that does not start with `/`.
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy
+
 make deploy                       # rsync mode (default) — ships the working tree, unpushed branches included
 make deploy DEPLOY_MODE=git       # git pull --ff-only on the VM instead
 make smoke BASE=https://cadence.grepon.cc

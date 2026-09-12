@@ -71,9 +71,62 @@ if ! ssh -o BatchMode=yes -o ConnectTimeout=10 -- "$HOST" true; then
   exit 3
 fi
 
+# The remote directory has to exist already, and this script must not create it (D-281).
+#
+# `mkdir -p` here is what turned a wrong `CADENCE_DEPLOY_PATH` into a *second* install beside the
+# running one. The default is `/opt/cadence` (D-161) and VM-201's install is at
+# `/home/user/docker/cadence` (D-257a), so a bare `make deploy` created the wrong directory,
+# rsynced into it, and stopped at `up` with a missing `.env` - which `docs/deploy.md` section 2
+# describes as the *expected* stop on a first deploy. The operator reads a normal message and
+# concludes the deploy worked as documented, while the running app was never touched.
+#
+# Requiring the directory costs nothing: section 2 already tells the operator to create it once.
+echo "deploy: checking $HOST:$REMOTE_PATH"
+REMOTE_STATE="$(ssh -- "$HOST" "
+  if [ ! -d '$REMOTE_PATH' ]; then echo missing
+  elif [ -d '$REMOTE_PATH/.git' ]; then echo clone
+  elif [ -f '$REMOTE_PATH/.env' ] || [ -f '$REMOTE_PATH/docker-compose.yml' ]; then echo install
+  else echo bare
+  fi")"
+
+# Fails closed on anything unexpected. An empty answer means the probe did not run as written,
+# and "carry on and hope" is the behaviour this whole block exists to remove.
+case "$REMOTE_STATE" in
+  missing|clone|install|bare) ;;
+  *)
+    echo "deploy: could not tell what '$REMOTE_PATH' is on $HOST (got '$REMOTE_STATE')." >&2
+    echo "        Refusing rather than guessing. Check ssh to '$HOST' by hand." >&2
+    exit 4
+    ;;
+esac
+
+if [[ "$REMOTE_STATE" == "missing" ]]; then
+  echo "deploy: '$REMOTE_PATH' does not exist on $HOST." >&2
+  echo "        Deploying there would create a second install beside the running app" >&2
+  echo "        rather than update it, and stop at a missing .env that reads like the" >&2
+  echo "        expected first-deploy pause." >&2
+  echo >&2
+  echo "        If this host's install lives elsewhere, name it - absolute, since a leading" >&2
+  echo "        '~' is refused by the path check above:" >&2
+  echo "          CADENCE_DEPLOY_PATH=/path/to/cadence make deploy" >&2
+  echo "        See docs/deploy.md section 3 for this host's value." >&2
+  echo >&2
+  echo "        If this really is a first deploy, create it first:" >&2
+  echo "          ssh $HOST 'mkdir -p $REMOTE_PATH'" >&2
+  exit 4
+fi
+
+# `--mode git` pulls, so it needs a clone and not merely a directory. Caught here rather than by
+# `git pull` failing halfway, because by then the chown and `up` below are still queued.
+if [[ "$MODE" == "git" && "$REMOTE_STATE" != "clone" ]]; then
+  echo "deploy: '$REMOTE_PATH' on $HOST is not a git clone, and --mode git pulls into one." >&2
+  echo "        Either clone it there, or use the default rsync mode, which ships the working" >&2
+  echo "        tree and carries unpushed branches (D-005, D-161)." >&2
+  exit 4
+fi
+
 if [[ "$MODE" == "rsync" ]]; then
   echo "deploy: rsync $REPO_ROOT/ -> $HOST:$REMOTE_PATH"
-  ssh -- "$HOST" "mkdir -p '$REMOTE_PATH'"
   # The first three excludes are load-bearing next to --delete. Without --exclude '.env' the VM's
   # real VITALFORGE_TOKEN and OMNIROUTE_KEY are wiped and Cadence comes back with sync skipped;
   # without --exclude 'data' the production database is deleted outright. Never type this by hand.

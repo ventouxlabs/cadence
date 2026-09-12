@@ -207,3 +207,131 @@ def test_neither_variable_accepts_a_leading_dash_or_a_quote(tmp_path: Path) -> N
         path = _run_with("cadence-deploy-test.invalid", value)
         assert path.returncode == 2, f"path {value!r} accepted: {path.stdout}{path.stderr}"
         assert "refusing remote path" in path.stderr, path.stderr
+
+
+# ------------------------------------------------- D-281: the wrong-directory trap
+
+#: A stub `ssh` that answers the two probes and logs every other remote command, so a test can
+#: assert what the deploy *would* have run without a host to run it on. `$1` is `--`, `$2` the
+#: host, `$3` the remote command - the shape every `ssh --` call in the script uses.
+_FAKE_SSH = """#!/usr/bin/env bash
+# The reachability probe: `ssh -o BatchMode=yes -o ConnectTimeout=10 -- HOST true`.
+for arg in "$@"; do [ "$arg" = "true" ] && exit 0; done
+cmd="${@: -1}"
+case "$cmd" in
+  *"if [ ! -d "*) echo "__STATE__" ;;
+  *) echo "$cmd" >> "$SSH_LOG" ;;
+esac
+exit 0
+"""
+
+_FAKE_RSYNC = """#!/usr/bin/env bash
+echo "rsync $*" >> "$SSH_LOG"
+exit 0
+"""
+
+
+def _run_against(tmp_path, state: str, *args: str) -> tuple[subprocess.CompletedProcess[str], str]:
+    """Run the deploy with a stubbed `ssh` reporting `state` for the remote directory."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "ssh").write_text(_FAKE_SSH.replace("__STATE__", state))
+    (bin_dir / "rsync").write_text(_FAKE_RSYNC)
+    for name in ("ssh", "rsync"):
+        (bin_dir / name).chmod(0o755)
+
+    log = tmp_path / "remote.log"
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin:/usr/local/bin",
+        "CADENCE_DEPLOY_HOST": "vm-201",
+        "CADENCE_DEPLOY_PATH": "/opt/cadence",
+        "SSH_LOG": str(log),
+    }
+    result = subprocess.run(
+        ["bash", str(SCRIPT), *args], env=env, capture_output=True, text=True, check=False, timeout=60
+    )
+    return result, log.read_text() if log.exists() else ""
+
+
+def test_deploy_refuses_a_remote_path_that_does_not_exist(tmp_path) -> None:
+    """D-281. `mkdir -p` used to create the wrong directory and deploy into it.
+
+    The trap is not that it failed — it is *how*. The rsync succeeded, compose stopped at a
+    missing `.env`, and `docs/deploy.md` §2 calls that stop expected on a first deploy. So the
+    operator read a normal message while the running app at `~/docker/cadence` was never touched.
+    """
+    result, remote = _run_against(tmp_path, "missing")
+
+    assert result.returncode == 4, result.stderr
+    assert "does not exist" in result.stderr
+    assert "CADENCE_DEPLOY_PATH" in result.stderr, "the refusal does not say how to fix it"
+    assert "rsync" not in remote, f"it deployed anyway: {remote}"
+    assert "up -d" not in remote, f"it brought a stack up in the wrong directory: {remote}"
+
+
+def test_deploy_never_creates_the_remote_directory(tmp_path) -> None:
+    """The `mkdir -p` that made the trap possible must not come back.
+
+    `mkdir -p data/backups` *inside* an existing install is a different thing and stays.
+    """
+    assert "mkdir -p '$REMOTE_PATH'" not in TEXT, "deploy.sh creates the remote directory again"
+    result, remote = _run_against(tmp_path, "missing")
+    assert result.returncode == 4
+    assert "mkdir -p /opt/cadence" not in remote, f"it created the directory: {remote}"
+
+
+def test_deploy_proceeds_into_a_prepared_directory(tmp_path) -> None:
+    """An existing but empty directory is the documented first deploy, and must still work.
+
+    §2 has the operator create it by hand before the first `make deploy`, so "exists and is
+    bare" is a legitimate state — the guard is about the directory being *absent*, not about it
+    being populated.
+    """
+    result, remote = _run_against(tmp_path, "bare")
+
+    assert result.returncode == 0, result.stderr
+    assert "rsync" in remote, "a prepared first deploy was refused"
+    assert "up -d" in remote
+
+
+def test_deploy_proceeds_into_an_existing_install(tmp_path) -> None:
+    """The routine case: a directory carrying `.env` or `docker-compose.yml`."""
+    result, remote = _run_against(tmp_path, "install")
+    assert result.returncode == 0, result.stderr
+    assert "rsync" in remote
+
+
+def test_git_mode_refuses_a_directory_that_is_not_a_clone(tmp_path) -> None:
+    """`--mode git` pulls, so a bare directory fails — caught before the chown and `up` queue."""
+    result, remote = _run_against(tmp_path, "bare", "--mode", "git")
+
+    assert result.returncode == 4, result.stderr
+    assert "not a git clone" in result.stderr
+    assert "git pull" not in remote, f"it pulled anyway: {remote}"
+    assert "up -d" not in remote
+
+
+def test_git_mode_accepts_a_clone(tmp_path) -> None:
+    result, remote = _run_against(tmp_path, "clone", "--mode", "git")
+    assert result.returncode == 0, result.stderr
+    assert "git pull --ff-only" in remote
+
+
+def test_deploy_refuses_an_unreadable_remote_state(tmp_path) -> None:
+    """Fails closed. An empty or unexpected probe answer is not permission to deploy anyway."""
+    result, remote = _run_against(tmp_path, "")
+
+    assert result.returncode == 4, result.stderr
+    assert "could not tell" in result.stderr
+    assert "rsync" not in remote, f"it deployed on an unreadable answer: {remote}"
+
+
+def test_the_refusal_does_not_hardcode_one_host_path(tmp_path) -> None:
+    """The script is the generic artifact; the host-specific value belongs in the runbook.
+
+    D-281 declined to bake a username into the repo's *default* for this reason, and an example
+    in the error message is the same decision one layer down.
+    """
+    result, _ = _run_against(tmp_path, "missing")
+    assert "/home/user/" not in result.stderr, f"the refusal names one operator's home: {result.stderr}"
+    assert "docs/deploy.md" in result.stderr, "the refusal does not say where the real value lives"
