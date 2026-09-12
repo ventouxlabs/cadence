@@ -24,6 +24,12 @@ data/*.db-wal
 data/*.db-shm
 data/backups/
 
+# Agent tooling
+#
+# gstack resolves its scratch dir to `.gstack/tmp` inside the repo when a skill runs here
+# (codex stderr captures, and so on). Disposable, and nothing in the project reads it.
+.gstack/
+
 # Node / Playwright
 node_modules/
 test-results/
