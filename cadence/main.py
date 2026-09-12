@@ -27,6 +27,7 @@ from cadence.api import today as api_today
 from cadence.api.envelope import err
 from cadence.config import MOCK_MODE, Settings, get_settings
 from cadence.db import init_db
+from cadence.logging_setup import configure_logging
 from cadence.vitalforge.periodic import periodic_sync
 from cadence.web.gate import SetupRequired, require_setup, setup_redirect
 from cadence.web.guards import RequestRefused, refusal_response
@@ -95,6 +96,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        # Before `init_db`, so the column migration it may run is actually logged (D-283, D-286).
+        configure_logging(active.log_level)
         engine = init_db(active)
         _refresh_bands(engine)
         # The one background task in the app (architecture section 1): no worker process, just a

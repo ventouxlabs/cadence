@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     host: str = Field(default="0.0.0.0", validation_alias="CADENCE_HOST")
     port: int = Field(default=8000, validation_alias="CADENCE_PORT")
     vitalforge_mode: Literal["live", "mock"] = Field(default="live", validation_alias="CADENCE_VITALFORGE_MODE")
+    # Production had no logging configuration at all, so every INFO record in this package
+    # was dropped by `logging.lastResort` (D-286). INFO by default: the lines this package
+    # writes are one-per-event, not per-request, and uvicorn owns the access log.
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(
+        default="INFO", validation_alias="CADENCE_LOG_LEVEL"
+    )
 
     vitalforge_weight_url: AnyHttpUrl = Field(
         default=AnyHttpUrl("https://weight.grepon.cc"), validation_alias="VITALFORGE_WEIGHT_URL"
