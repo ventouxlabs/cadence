@@ -29,7 +29,10 @@ On **VM-201**:
   call the same SQLite Online Backup API.
 - Tailscale up and the host reachable on its Tailscale address.
 - Nginx Proxy Manager already running (it fronts VitalForge on the same host).
-- A directory at `/opt/cadence`, writable by the deploying user.
+- A directory for the install, writable by the deploying user, **created before the first
+  deploy** — `scripts/deploy.sh` refuses a path that does not exist rather than creating it
+  (D-281). `/opt/cadence` by default; `/home/user/docker/cadence` on VM-201 (D-257a), named
+  with `CADENCE_DEPLOY_PATH`.
 
 On the **workstation**:
 
@@ -53,8 +56,9 @@ On the **workstation**:
 > **`/home/user/docker/cadence`**, not `/opt/cadence` — VitalForge lives at
 > `~/docker/vitalforge`, and matching the host's own convention beat matching this document.
 > It was deployed by `git clone` of the public repo rather than by `make deploy`, because the
-> workstation had nothing to rsync that GitHub did not already have. Substitute that path
-> throughout this file. Everything else below is accurate.
+> workstation had nothing to rsync that GitHub did not already have. **The runnable commands
+> in this section now use that path directly** rather than asking you to substitute it — D-280
+> and D-281 are both what "substitute throughout" costs in practice. Everything else is accurate.
 >
 > **A manual clone skips `scripts/deploy.sh`, and therefore skips the chown.** That is the one
 > step a `git clone && docker compose up` path silently misses, and it fails exactly as
@@ -67,9 +71,13 @@ On the **workstation**:
 > ```
 
 ```bash
-# On VM-201, once.
-sudo mkdir -p /opt/cadence && sudo chown "$USER" /opt/cadence
+# On VM-201, once. `scripts/deploy.sh` refuses a path that does not exist rather than
+# creating one (D-281), so this step is deliberate and not a convenience.
+sudo mkdir -p /home/user/docker/cadence && sudo chown "$USER" /home/user/docker/cadence
 ```
+
+On a host with no convention of its own, `/opt/cadence` is the script's default and needs no
+`CADENCE_DEPLOY_PATH`. VM-201 has one (D-257a), so every command below names the real path.
 
 Ship the code, then create the secrets file **by hand**. `.env` is never rsynced, never
 committed, and never baked into the image. **Order matters:** `env_file: .env` makes Compose
@@ -79,24 +87,24 @@ the two:
 
 ```bash
 # 1. Workstation - ships the tree, then stops at `up` with a missing .env
-make deploy
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy
 
 # 2. VM-201, once: create .env from the committed template and fill in the real tokens
-cd /opt/cadence
+cd /home/user/docker/cadence
 cp .env.example .env
 chmod 600 .env
 ${EDITOR:-nano} .env                # VITALFORGE_TOKEN, OMNIROUTE_KEY, the two person slugs
 
 # 3. Workstation - now it completes
-make deploy
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy
 ```
 
 `scripts/deploy.sh` creates `data/` and `data/backups/` and chowns them to uid 10001 before
 bringing the stack up. Doing it by hand instead:
 
 ```bash
-mkdir -p /opt/cadence/data/backups
-sudo chown -R 10001:10001 /opt/cadence/data
+mkdir -p /home/user/docker/cadence/data/backups
+sudo chown -R 10001:10001 /home/user/docker/cadence/data
 ```
 
 **Why 10001.** The container runs non-root, and a bind mount that compose created is owned by
@@ -149,9 +157,24 @@ file`.
 ## 3. Routine deploy
 
 ```bash
-make deploy                       # rsync mode (default)
-make deploy DEPLOY_MODE=git       # git pull --ff-only on the VM instead
+# VM-201's install is not at the script's default path, so name it (D-257a, D-281).
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy
+
+# Same, in git mode - `git pull --ff-only` on the VM rather than shipping the working tree.
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy DEPLOY_MODE=git
 ```
+
+A bare `make deploy` uses the script's own default, which is the right thing on a host that has
+no convention of its own and the **wrong** thing here — that is the whole of D-281.
+
+> **The path is absolute or nothing.** `scripts/deploy.sh` refuses anything not matching
+> `^/[A-Za-z0-9._/-]*$`, because it is interpolated into a remote shell command — so
+> `/home/user/docker/cadence`, not `~/docker/cadence`. An unquoted `~` in the assignment above
+> happens to work because bash expands it first, which is a coincidence and not a guarantee.
+>
+> A deploy into a directory that **does not exist** is refused outright (exit 4) rather than
+> created. That `mkdir -p` is what used to turn a wrong path into a second install beside the
+> running one (D-281); §8 has the symptom.
 
 | | rsync (default) | git |
 |---|---|---|
@@ -160,8 +183,9 @@ make deploy DEPLOY_MODE=git       # git pull --ff-only on the VM instead
 | Con | the VM's state is not a commit | needs the commit pushed first |
 
 rsync is the default because PRP-05's VitalForge branch is deliberately never pushed (D-005)
-and there will be things to try before pushing. `--mode git` needs a clone at `/opt/cadence`
-with a remote and a checked-out branch.
+and there will be things to try before pushing. `--mode git` needs a **clone** at the deploy path, with a
+remote and a checked-out branch; a directory that is not one is refused (exit 4) rather than
+left to fail on `git pull` with the chown and `up` still queued behind it.
 
 The rsync carries `--delete` and therefore two load-bearing excludes:
 
@@ -180,7 +204,7 @@ An upgrade is a routine deploy: `git pull` on the workstation, `make deploy`, th
 the release touches the schema:
 
 ```bash
-ssh vm-201 'cd /opt/cadence && ./scripts/backup.sh'
+ssh vm-201 'cd /home/user/docker/cadence && ./scripts/backup.sh'
 ```
 
 ### Changing a secret on a running install
@@ -311,7 +335,7 @@ collide on host 8090 (D-206). The address belongs in the base file's single entr
 Run it **inside the container**:
 
 ```bash
-cd /opt/cadence && docker compose exec -T cadence ./scripts/backup.sh
+cd /home/user/docker/cadence && docker compose exec -T cadence ./scripts/backup.sh
 # backup: /app/data/backups/cadence-20260907-0317.db (via python)
 ```
 
@@ -323,7 +347,7 @@ is not the same problem at all. Running it on the host works when the caller is 
 `data/`:
 
 ```bash
-sudo -u '#10001' env CADENCE_DB_PATH=/opt/cadence/data/cadence.db /opt/cadence/scripts/backup.sh
+sudo -u '#10001' env CADENCE_DB_PATH=/home/user/docker/cadence/data/cadence.db /home/user/docker/cadence/scripts/backup.sh
 ```
 
 It uses `sqlite3 "$DB" ".backup"`, never `cp`. The database runs in WAL mode, so the `.db` file
@@ -340,12 +364,12 @@ on every deploy, so it already exists at `0755` and the files alone would have t
 snapshot is the entire database — both profiles' training history, bodyweights and body-fat
 readings — and VM-201 is shared with VitalForge, while the `.env` beside it is `600` (D-201).
 Snapshots taken before this was added keep their old modes: run
-`chmod 600 /opt/cadence/data/backups/*.db` once, if any exist.
+`chmod 600 /home/user/docker/cadence/data/backups/*.db` once, if any exist.
 
 Cron, installed by hand on VM-201 (`crontab -e`):
 
 ```cron
-17 3 * * * cd /opt/cadence && docker compose exec -T cadence ./scripts/backup.sh >> /var/log/cadence-backup.log 2>&1
+17 3 * * * cd /home/user/docker/cadence && docker compose exec -T cadence ./scripts/backup.sh >> /var/log/cadence-backup.log 2>&1
 ```
 
 `-T` matters: cron has no TTY, and without it `docker compose exec` fails every night with
@@ -356,7 +380,7 @@ Cron, installed by hand on VM-201 (`crontab -e`):
 ### Restore
 
 ```bash
-cd /opt/cadence
+cd /home/user/docker/cadence
 docker compose down
 
 # All three, not just the .db. A stale -wal beside a restored database is replayed over it by
@@ -425,7 +449,7 @@ branch is deployed (D-005), and reports `will sync` while it does.
 
 | Symptom | Cause and fix |
 |---|---|
-| `unable to open database file` at startup | `./data` is not owned by uid 10001. `sudo chown -R 10001:10001 /opt/cadence/data`. On the workstation under rootless podman: `podman unshare chown -R 10001:10001 data`. |
+| `unable to open database file` at startup | `./data` is not owned by uid 10001. `sudo chown -R 10001:10001 /home/user/docker/cadence/data`. On the workstation under rootless podman: `podman unshare chown -R 10001:10001 data`. |
 | The same message on the workstation *after* the chown | SELinux. The compose file mounts `./data:/app/data:Z` for this; if a container is started by hand, pass `:Z` too. Not a VM-201 problem. |
 | `unable to open database file` from `backup.sh`, app running fine | The *output* path, not the input: the caller cannot write `data/backups/`, which uid 10001 owns. Run the backup inside the container (§6). |
 | `make dev-docker` shows no health status | podman-compose builds an OCI image and OCI has no healthcheck field. The target builds with `--format docker` first for this reason; a hand-run `podman build` needs the same flag. |
@@ -435,6 +459,7 @@ branch is deployed (D-005), and reports `will sync` while it does.
 | Container reports `unhealthy` but keeps running | The opposite case, and the one `restart:` does **not** cover: Docker's restart policy acts on exit, never on a failing healthcheck, so an unhealthy container stays up and NPM keeps sending it traffic. `docker inspect --format '{{json .State.Health}}' cadence \| jq .` shows the last outputs; a 200 with `ok: false` means the database check failed, so check `./data` ownership. |
 | 502 from NPM | Container down, or NPM is pointed at container port 8000 instead of host port 8090. |
 | — | **Keep `docker inspect` scoped, as the rows above do.** A bare `docker inspect cadence` prints `Config.Env`, which is every variable the container was started with — including `VITALFORGE_TOKEN` and `OMNIROUTE_KEY` in full. That output routinely gets pasted into a chat or an issue. Always pass `--format`, e.g. `--format '{{json .State.Health}}'`. |
+| `make deploy` succeeds but nothing changes, or stops at a missing `.env` on a host that has one | It deployed to the **wrong directory**. `CADENCE_DEPLOY_PATH` defaults to `/opt/cadence` and VM-201's install is `/home/user/docker/cadence` (D-257a). `scripts/deploy.sh` now refuses a path that does not exist (exit 4) instead of creating one, but a *different* prepared directory is still a valid target — check the `deploy: rsync ... -> host:path` line it prints (D-281). |
 | 413 on Import | `client_max_body_size 5m` missing from the proxy host's Advanced tab (§4). |
 | Disk full on VM-201 | Unrotated container logs. The prod overlay exists to prevent this — confirm the deploy used `-f docker-compose.prod.yml`. |
 | `/today` is stale after a deploy | NPM Cache Assets is on, or the phone's service worker is holding the old shell. Turn caching off and hard-reload once. |

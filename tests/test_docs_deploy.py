@@ -253,3 +253,37 @@ def test_the_proxy_forward_host_is_read_not_copied() -> None:
     """
     row = next(line for line in DOC.splitlines() if "Forward Hostname" in line)
     assert "docker compose port" in row, f"the runbook hands NPM an address to copy: {row}"
+
+
+def _fenced_command_lines(text: str) -> list[str]:
+    """Every line inside a ``` fence that is a command rather than a comment or a fence marker."""
+    out: list[str] = []
+    inside = False
+    for line in text.splitlines():
+        if line.lstrip().startswith("```"):
+            inside = not inside
+            continue
+        stripped = line.strip()
+        if inside and stripped and not stripped.startswith("#"):
+            out.append(line)
+    return out
+
+
+def test_no_runnable_command_names_the_default_path_on_this_host(tmp_path=None) -> None:
+    """D-281. The runbook documents VM-201, whose install is not at the script's default.
+
+    Prose may name `/opt/cadence` — it *is* the default, and saying so is the point. A command
+    somebody pastes may not, because on this host it targets a directory beside the running app.
+    D-280 established that a "substitute this path throughout" note does not count as recording
+    the difference; this is that rule, enforced.
+    """
+    offenders = [line for line in _fenced_command_lines(DOC) if "/opt/cadence" in line]
+    assert not offenders, "runnable commands still name the default path: " + "; ".join(
+        line.strip() for line in offenders
+    )
+
+
+def test_the_backup_cron_targets_the_install() -> None:
+    """The cron is installed by copy-paste and then never read again until a restore needs it."""
+    cron = next(line for line in DOC.splitlines() if line.startswith("17 3 * * *"))
+    assert "/opt/cadence" not in cron, f"the nightly backup cds to a directory beside the app: {cron}"
