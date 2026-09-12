@@ -10,7 +10,7 @@ Written at the close of PRP-10. Read this before touching anything.
 > |---|---|
 > | Live at | `https://cadence.grepon.cc` (valid cert, ~100 ms) |
 > | Running on | VM-201 (`knowledge`), `~/docker/cadence`, container healthy, `restart: unless-stopped` |
-> | Published on | `${CADENCE_BIND_ADDR}:8090` = the **Tailscale** address; the LAN cannot reach it (D-257c) |
+> | Published on | `100.74.76.39:8090`, VM-201's **Tailscale** address. The LAN genuinely cannot reach it — `192.168.1.21:8090` answers nothing, rechecked 2026-09-11 (D-257c, D-282) |
 > | Both integrations | **Connected.** VitalForge reads real body-comp and readiness; OmniRoute sees 1374 models |
 > | Write-back | **Complete.** The VitalForge endpoint is merged (PR #42) and live — verified by probe (D-278) |
 > | Backups | Nightly 03:17 cron, in-container, verified |
