@@ -254,9 +254,11 @@ New Proxy Host:
 | Access List | optional, §5 |
 
 **The forward address has to be one the publish is bound to.** §5 narrows the bind from
-`0.0.0.0` to a Tailscale address, and **VM-201 is in that narrowed state** — D-257c records
-`CADENCE_BIND_ADDR=100.74.76.39`, verified there on 2026-09-07, with `192.168.1.21:8090`
-refusing. So this field is not the LAN IP on that host. Setting `CADENCE_BIND_ADDR` and leaving
+`0.0.0.0` to a Tailscale address, and **VM-201 is in that narrowed state** —
+`CADENCE_BIND_ADDR=100.74.76.39`, with `docker compose port cadence 8000` answering
+`100.74.76.39:8090` and `192.168.1.21:8090` returning nothing at all. Checked on the host
+2026-09-11 (D-282), not inferred; `https://cadence.grepon.cc` answers 200 through the proxy, so
+NPM is already forwarding to the Tailscale address. So this field is not the LAN IP on that host. Setting `CADENCE_BIND_ADDR` and leaving
 this field on the LAN IP is the one ordering that turns a working proxy into a 502 with a
 perfectly healthy container behind it. Do not copy an address from this document into NPM — read
 the live one, which is authoritative in a way a document cannot be:
