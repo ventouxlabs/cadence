@@ -129,10 +129,11 @@ Commands below are quoted verbatim from `docs/deploy.md`; that document is the s
 > document it was written from.** They are named at the top of this file too; they are repeated
 > here because this is where somebody copy-pastes.
 >
-> - **`/opt/cadence` → `~/docker/cadence`.** The host's own convention won (D-257a). The commands
->   below still say `/opt/cadence` because they are quotes; create and `cd` into
->   `~/docker/cadence` instead. The deploy script takes it from the environment — see
->   `docs/deploy.md` §1 for the variable name, which is not a `.env` key.
+> - **The install is at `~/docker/cadence`, not `/opt/cadence`.** The host's own convention won
+>   (D-257a). The commands below name the real path directly rather than asking you to
+>   substitute it — that habit is what D-280 and D-281 cost. Spelled absolutely, because
+>   `scripts/deploy.sh` refuses a path that does not start with `/`, and it **refuses a path that
+>   does not exist** rather than creating one (D-281): the `mkdir` below is a deliberate step.
 > - **The published port is not on the LAN.** `CADENCE_BIND_ADDR=100.74.76.39` — VM-201's
 >   Tailscale address (D-257c) — so `192.168.1.21:8090` refuses, and any health check written
 >   against it fails in a way that reads like a container that never started.
@@ -142,22 +143,22 @@ Prerequisites: Docker Engine + Compose plugin on VM-201; an ssh alias `vm-201` w
 First deploy — order matters, because `env_file: .env` makes Compose refuse to start without it, so the first `make deploy` is expected to fail at `up`:
 
 ```bash
-# On VM-201, once.
-sudo mkdir -p /opt/cadence && sudo chown "$USER" /opt/cadence
+# On VM-201, once. The deploy will not create this for you (D-281).
+sudo mkdir -p /home/user/docker/cadence && sudo chown "$USER" /home/user/docker/cadence
 ```
 
 ```bash
 # 1. Workstation - ships the tree, then stops at `up` with a missing .env
-make deploy
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy
 
 # 2. VM-201, once: create .env from the committed template and fill in the real tokens
-cd /opt/cadence
+cd /home/user/docker/cadence
 cp .env.example .env
 chmod 600 .env
 ${EDITOR:-nano} .env                # VITALFORGE_TOKEN, OMNIROUTE_KEY, the two person slugs
 
 # 3. Workstation - now it completes
-make deploy
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy
 ```
 
 `.env` keys to fill (never a real value in this repo or in `.env.example` — it ships blank):
@@ -191,14 +192,18 @@ publish follows `CADENCE_BIND_ADDR`, and asking it where it is works on both bin
 Routine deploys after that:
 
 ```bash
-# The install is not at the script's default path, so name it (D-257a, D-281).
-# Absolute — `scripts/deploy.sh` refuses a path that does not start with `/`.
+# rsync mode (default) — ships the working tree, unpushed branches included.
 CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy
 
-make deploy                       # rsync mode (default) — ships the working tree, unpushed branches included
-make deploy DEPLOY_MODE=git       # git pull --ff-only on the VM instead
+# git mode — `git pull --ff-only` on the VM instead; needs a clone at that path.
+CADENCE_DEPLOY_PATH=/home/user/docker/cadence make deploy DEPLOY_MODE=git
+
 make smoke BASE=https://cadence.grepon.cc
 ```
+
+A bare `make deploy` uses the script's own default, `/opt/cadence`, which is not this install —
+the whole of D-281. It now refuses rather than building a second one, but the deploy you wanted
+still has not happened, so name the path every time.
 
 **Healthcheck to watch:** `docker compose ps` must report `(healthy)`, not just `Up` — Docker's restart policy only acts on process exit, never on a failing healthcheck, so an unhealthy-but-running container keeps serving traffic silently. `docker inspect --format '{{json .State.Health}}' cadence | jq .` shows the last output. Never run a bare `docker inspect cadence` — it prints `Config.Env` in full, including both secrets.
 
