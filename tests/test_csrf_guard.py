@@ -196,3 +196,43 @@ def test_no_origin_and_no_referer_is_allowed() -> None:
 
 def test_a_safe_method_is_never_refused() -> None:
     assert not _refused(_request("GET", host=HOST, origin="null"))
+
+
+# ------------------------------------------------------------------ Sec-Fetch-Site
+
+
+@pytest.mark.parametrize("origin", [None, "http://cadence.tail1234.ts.net:8090"])
+@pytest.mark.parametrize("value", ["cross-site", "Cross-Site"])
+def test_a_cross_site_fetch_is_refused_whatever_the_origin_says(origin: str | None, value: str) -> None:
+    headers = {"host": HOST, "sec_fetch_site": value}
+    if origin:
+        headers["origin"] = origin
+    assert _refused(_request(**headers))
+
+
+@pytest.mark.parametrize("value", ["same-origin", "same-site", "none", "bogus"])
+def test_other_fetch_sites_fall_through_to_the_origin_check(value: str) -> None:
+    assert not _refused(_request(host=HOST, sec_fetch_site=value))
+    assert not _refused(_request(host=HOST, sec_fetch_site=value, origin=f"http://{HOST}"))
+    assert _refused(_request(host=HOST, sec_fetch_site=value, origin="http://evil.example"))
+
+
+def test_a_cross_site_fetch_on_a_safe_method_is_not_refused() -> None:
+    assert not _refused(_request("GET", host=HOST, sec_fetch_site="cross-site"))
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [pytest.param(m, p, id=f"{m} {p}") for m, p in _unsafe_routes(__import__("cadence.main", fromlist=["app"]).app)],
+)
+async def test_a_cross_site_fetch_is_refused_on_every_write_route(
+    client: httpx.AsyncClient, method: str, path: str
+) -> None:
+    url = re.sub(r"\{[^}]+\}", "1", path)
+    response = await client.request(method, url, headers={"sec-fetch-site": "cross-site", "origin": "http://test"})
+    assert response.status_code == 422, (method, path, response.text)
+    assert "another site" in response.text
+
+
+def test_a_backslash_in_a_referer_path_is_not_hostile() -> None:
+    assert not _refused(_request(host=HOST, referer=f"http://{HOST}/a\\b"))

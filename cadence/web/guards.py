@@ -94,8 +94,7 @@ def _authority(value: str, *, is_url: bool) -> tuple[str, int | None]:
     """The comparable ``(host, port)`` of an ``Origin``/``Referer`` URL or a ``Host`` authority.
 
     Raises ``ValueError`` for anything that is not plainly one: ``null``, an empty value, no
-    scheme, a scheme that is not http(s), userinfo, a backslash (browsers read it as a slash, so
-    ``http://a\\@b`` names a different host to the parser than to the browser), a bad port. The
+    scheme, a scheme that is not http(s), userinfo, a bad port. The
     caller treats that as a refusal: a header that is present and unreadable is not "absent".
 
     Case is folded, one trailing dot is dropped (``example.com.`` is ``example.com``), and the
@@ -103,8 +102,8 @@ def _authority(value: str, *, is_url: bool) -> tuple[str, int | None]:
     whole, never by suffix, so ``evil.example.com`` and ``example.com.evil.net`` never match.
     """
     value = value.strip()
-    if not value or "\\" in value:
-        raise ValueError("empty or backslashed")
+    if not value:
+        raise ValueError("empty")
     split = urlsplit(value if is_url else f"//{value}")
     if is_url and (split.scheme.lower() not in _WEB_SCHEMES or not split.netloc):
         raise ValueError("not an http(s) URL")
@@ -135,12 +134,19 @@ def require_same_origin(request: Request) -> None:
     """
     if request.method not in UNSAFE_METHODS:
         return
+    # Browsers always send Sec-Fetch-Site and a page cannot forge it; non-browser clients omit it.
+    # Only "cross-site" is refused: the other values (and none at all) go on to the Origin check.
+    # Scheme is deliberately not compared anywhere here: behind a TLS-terminating proxy the app
+    # sees http while Origin says https. Known limit: a network attacker could downgrade a scheme.
+    # Refusals are 422, not 403: the envelope and the Settings partial depend on it, so monitoring
+    # sees CSRF blocks as 422.
+    cross_site = request.headers.get("sec-fetch-site", "").strip().lower() == "cross-site"
     declared = [*request.headers.getlist("origin"), *request.headers.getlist("referer")]
-    if not declared:
+    if not declared and not cross_site:
         return
     try:
         host = _authority(request.headers.get("host", ""), is_url=False)
-        foreign = any(_authority(value, is_url=True) != host for value in declared)
+        foreign = cross_site or any(_authority(value, is_url=True) != host for value in declared)
     except ValueError:
         foreign = True
     if foreign:
