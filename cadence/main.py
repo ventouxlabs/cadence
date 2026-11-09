@@ -30,7 +30,7 @@ from cadence.db import init_db
 from cadence.logging_setup import configure_logging
 from cadence.vitalforge.periodic import periodic_sync
 from cadence.web.gate import SetupRequired, require_setup, setup_redirect
-from cadence.web.guards import RequestRefused, refusal_response
+from cadence.web.guards import RequestRefused, refusal_response, require_same_origin
 from cadence.web.rendering import STATIC_DIR
 from cadence.web.routers import assess as web_assess
 from cadence.web.routers import history as web_history
@@ -119,7 +119,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             with suppress(asyncio.CancelledError):
                 await task
 
-    app = FastAPI(title="Cadence", version="0.1.0", lifespan=lifespan)
+    # The same-origin guard is app-level, not per router: every route that writes gets it, including
+    # one added tomorrow, and tests/test_csrf_guard.py walks the route table to prove it.
+    app = FastAPI(
+        title="Cadence",
+        version="0.1.0",
+        lifespan=lifespan,
+        dependencies=[Depends(require_same_origin)],
+    )
 
     @app.exception_handler(RequestValidationError)
     async def _invalid_body(request: Request, exc: RequestValidationError) -> JSONResponse:
