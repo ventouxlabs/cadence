@@ -86,12 +86,34 @@ def enforce_declared_size(request: Request) -> None:
         raise RequestRefused(untrusted.TOO_LARGE, f"a workout must be under {MAX_BODY_BYTES // 1024} KB")
 
 
-def _host_of(value: str | None) -> str | None:
-    """The ``host:port`` of a URL or of a bare authority, or ``None`` when there is nothing to read."""
-    if not value or value == "null":
-        return None
-    split = urlsplit(value if "//" in value else f"//{value}")
-    return split.netloc.lower() or None
+_DEFAULT_PORTS = frozenset({80, 443})
+_WEB_SCHEMES = frozenset({"http", "https"})
+
+
+def _authority(value: str, *, is_url: bool) -> tuple[str, int | None]:
+    """The comparable ``(host, port)`` of an ``Origin``/``Referer`` URL or a ``Host`` authority.
+
+    Raises ``ValueError`` for anything that is not plainly one: ``null``, an empty value, no
+    scheme, a scheme that is not http(s), userinfo, a bad port. The
+    caller treats that as a refusal: a header that is present and unreadable is not "absent".
+
+    Case is folded, one trailing dot is dropped (``example.com.`` is ``example.com``), and the
+    default ports 80 and 443 are dropped so ``https://h`` equals ``Host: h:443``. Hosts are compared
+    whole, never by suffix, so ``evil.example.com`` and ``example.com.evil.net`` never match.
+    """
+    value = value.strip()
+    if not value:
+        raise ValueError("empty")
+    split = urlsplit(value if is_url else f"//{value}")
+    if is_url and (split.scheme.lower() not in _WEB_SCHEMES or not split.netloc):
+        raise ValueError("not an http(s) URL")
+    if "@" in split.netloc:
+        raise ValueError("userinfo")
+    host = (split.hostname or "").rstrip(".")
+    if not host:
+        raise ValueError("no host")
+    port = split.port  # ValueError on a non-numeric or out-of-range port
+    return host, None if port in _DEFAULT_PORTS else port
 
 
 def require_same_origin(request: Request) -> None:
@@ -103,22 +125,36 @@ def require_same_origin(request: Request) -> None:
     send it. Comparing the declared origin against the host is the check that costs nothing and
     needs no token (D-186).
 
-    A header that is absent is not evidence of anything: ``curl`` sends neither, and so does the
-    service worker's replay. Only a header that is *present and different* is refused.
+    A header that is *absent* is not evidence of anything: ``curl`` sends neither, and so does the
+    service worker's replay. A header that is *present* must name this host: ``Origin: null`` (what
+    a sandboxed iframe or a cross-origin redirect sends) and anything unparseable are refused, and
+    so is a repeated header with any value that is foreign.
+
+    The guard is installed app-wide in ``create_app``, so a new route cannot be left without it.
     """
     if request.method not in UNSAFE_METHODS:
         return
-    host = _host_of(request.headers.get("host"))
-    if host is None:
+    # Browsers always send Sec-Fetch-Site and a page cannot forge it; non-browser clients omit it.
+    # Only "cross-site" is refused: the other values (and none at all) go on to the Origin check.
+    # Scheme is deliberately not compared anywhere here: behind a TLS-terminating proxy the app
+    # sees http while Origin says https. Known limit: a network attacker could downgrade a scheme.
+    # Refusals are 422, not 403: the envelope and the Settings partial depend on it, so monitoring
+    # sees CSRF blocks as 422.
+    cross_site = request.headers.get("sec-fetch-site", "").strip().lower() == "cross-site"
+    declared = [*request.headers.getlist("origin"), *request.headers.getlist("referer")]
+    if not declared and not cross_site:
         return
-    for header in ("origin", "referer"):
-        declared = _host_of(request.headers.get(header))
-        if declared is not None and declared != host:
-            logger.warning("refused a cross-site %s to %s", request.method, request.url.path)
-            raise RequestRefused(
-                untrusted.PARSE_ERROR,
-                "this request came from another site and was not carried out",
-            )
+    try:
+        host = _authority(request.headers.get("host", ""), is_url=False)
+        foreign = cross_site or any(_authority(value, is_url=True) != host for value in declared)
+    except ValueError:
+        foreign = True
+    if foreign:
+        logger.warning("refused a cross-site %s to %s", request.method, request.scope.get("path"))
+        raise RequestRefused(
+            untrusted.PARSE_ERROR,
+            "this request came from another site and was not carried out",
+        )
 
 
 async def read_bounded_form(request: Request) -> FormData:
