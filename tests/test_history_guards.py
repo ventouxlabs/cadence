@@ -223,6 +223,11 @@ def _scoped_chunks(html: str) -> list[str]:
     return pattern.findall(html)
 
 
+def _recent(days_ago: int) -> str:
+    """A date inside the trend's 30-day window whenever the suite runs; fixed dates age out of it."""
+    return (datetime.now(UTC).astimezone().date() - timedelta(days=days_ago)).isoformat()
+
+
 async def test_the_sons_history_carries_no_body_words(history_db: DbSession, client: httpx.AsyncClient) -> None:
     """PRP-03's own check (D-027), run server-side against ``/history?profile=son``.
 
@@ -234,7 +239,7 @@ async def test_the_sons_history_carries_no_body_words(history_db: DbSession, cli
         MetricsCache(
             profile_id=PROFILE_SON,
             fetched_at=datetime.now(UTC).isoformat(),
-            payload_json=json.dumps({"weight_kg": [["2026-09-01", 40.0], ["2026-09-05", 40.5]]}),
+            payload_json=json.dumps({"weight_kg": [[_recent(4), 40.0], [_recent(0), 40.5]]}),
         )
     )
     history_db.commit()
@@ -262,8 +267,8 @@ async def test_the_together_tab_carries_no_body_words_either(history_db: DbSessi
             fetched_at=datetime.now(UTC).isoformat(),
             payload_json=json.dumps(
                 {
-                    "weight_kg": [["2026-09-01", 85.2], ["2026-09-05", 84.1]],
-                    "body_fat_pct": [["2026-09-01", 19.1], ["2026-09-05", 18.2]],
+                    "weight_kg": [[_recent(4), 85.2], [_recent(0), 84.1]],
+                    "body_fat_pct": [[_recent(4), 19.1], [_recent(0), 18.2]],
                 }
             ),
         )
