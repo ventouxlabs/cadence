@@ -254,7 +254,7 @@ New Proxy Host:
 | Access List | optional, §5 |
 
 **The forward address has to be one the publish is bound to.** §5 narrows the bind from
-`0.0.0.0` to a Tailscale address, and **VM-201 is in that narrowed state** —
+`127.0.0.1` (or whatever was set) to a Tailscale address, and **VM-201 is in that narrowed state** —
 `CADENCE_BIND_ADDR=100.74.76.39`, with `docker compose port cadence 8000` answering
 `100.74.76.39:8090` and `192.168.1.21:8090` returning nothing at all. Checked on the host
 2026-09-11 (D-282), not inferred; `https://cadence.grepon.cc` answers 200 through the proxy, so
@@ -321,9 +321,9 @@ port is not on the LAN until somebody says otherwise. Remote access (NPM, Tailsc
 `CADENCE_BIND_ADDR` set explicitly in `.env`; with the default, a containerised NPM forwarding to
 the host's LAN or Tailscale address gets a 502. The in-container uvicorn host stays `0.0.0.0`.
 
-Two things not to do. **Do not use `127.0.0.1`**: NPM runs on this host but is containerised, so
-it reaches Cadence over a host interface and never over the host's loopback — a loopback-only
-bind 502s the proxy. Whatever address you do bind, put that same one in NPM's Forward Hostname
+Two things not to do. **Do not leave the default when NPM fronts Cadence**: NPM runs on this host but is
+containerised, so it reaches Cadence over a host interface and never over the host's loopback — the loopback
+default 502s the proxy until `CADENCE_BIND_ADDR` names the Tailscale address. Whatever address you do bind, put that same one in NPM's Forward Hostname
 field (§4). And **do not add a
 `ports` entry to `docker-compose.prod.yml`**: compose *appends* `ports` across `-f` files rather
 than overriding them, so the base mapping stays published alongside the new one and the two
