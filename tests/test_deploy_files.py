@@ -92,7 +92,7 @@ def test_dockerignore_excludes_env_and_data() -> None:
 
 def test_compose_maps_8090_to_8000(compose: dict) -> None:
     """6. Host 8090 to container 8000, through the configurable bind address."""
-    assert compose["services"]["cadence"]["ports"] == ["${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000"]
+    assert compose["services"]["cadence"]["ports"] == ["${CADENCE_BIND_ADDR:-127.0.0.1}:8090:8000"]
 
 
 def test_the_published_port_is_one_entry_with_a_variable_address() -> None:
@@ -107,21 +107,27 @@ def test_the_published_port_is_one_entry_with_a_variable_address() -> None:
         service = document.get("services", {}).get("cadence") or {}
         ports = service.get("ports")
         if path.name == "docker-compose.yml":
-            assert ports == ["${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000"], path.name
+            assert ports == ["${CADENCE_BIND_ADDR:-127.0.0.1}:8090:8000"], path.name
         else:
             assert ports is None, f"{path.name} declares ports; compose appends them rather than overriding"
 
 
-def test_the_bind_address_defaults_to_todays_behaviour() -> None:
-    """The default must not change what an existing deploy publishes.
+def test_the_bind_address_defaults_to_loopback() -> None:
+    """The default must not publish an unauthenticated API on every interface.
 
-    A default of 127.0.0.1 would have been the tempting one and is wrong here: NPM runs on
-    VM-201 but is containerised and forwards to the host's LAN IP (docs/deploy.md section 4), so
-    loopback-only would break the proxy. Closing the LAN gap is the operator setting
-    CADENCE_BIND_ADDR to the Tailscale address, which this default leaves one variable away.
+    Cadence has no login, so a 0.0.0.0 default exposes a child's profile and sessions to the
+    whole LAN. A deploy that needs remote access (NPM, Tailscale) sets CADENCE_BIND_ADDR
+    explicitly, as VM-201 does (D-257c); a fresh install fails closed instead of wide.
     """
     entry = yaml.safe_load((REPO / "docker-compose.yml").read_text())["services"]["cadence"]["ports"][0]
-    assert ":-0.0.0.0}" in entry, "the default bind address changed; an existing deploy would move"
+    assert ":-127.0.0.1}" in entry, "the default bind address must be loopback"
+    assert "0.0.0.0" not in entry
+
+
+def test_env_example_does_not_bind_every_interface() -> None:
+    """Copying .env.example to .env must not silently reopen the wide bind."""
+    lines = (REPO / ".env.example").read_text().splitlines()
+    assert "CADENCE_BIND_ADDR=0.0.0.0" not in lines
 
 
 def test_compose_uses_env_file_not_inline_secrets(compose: dict) -> None:

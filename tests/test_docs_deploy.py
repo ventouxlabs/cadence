@@ -288,3 +288,10 @@ def test_the_backup_cron_targets_the_install() -> None:
     """The cron is installed by copy-paste and then never read again until a restore needs it."""
     cron = next(line for line in DOC.splitlines() if line.startswith("17 3 * * *"))
     assert "/opt/cadence" not in cron, f"the nightly backup cds to a directory beside the app: {cron}"
+
+
+def test_deploy_doc_does_not_forbid_the_loopback_default() -> None:
+    """The compose default is 127.0.0.1; the runbook must not also say "Do not use 127.0.0.1"."""
+    compose = (REPO / "docker-compose.yml").read_text()
+    assert ":-127.0.0.1}" in compose
+    assert "Do not use `127.0.0.1`" not in DOC

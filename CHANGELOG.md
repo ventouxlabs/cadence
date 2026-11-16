@@ -4,6 +4,9 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 
 ## [Unreleased]
 
+### bind default (2026-11-16)
+- Breaking for fresh installs: the compose port now binds `127.0.0.1` by default (D-287); set `CADENCE_BIND_ADDR` before NPM can reach Cadence. VM-201 already sets it.
+
 ### solo mode (2026-09-09)
 - New `son_enabled` setting (default on): hides the son's profile everywhere — tabs drop to "Me", HTML screens bounce `?profile=son|together` to `?profile=me`, profile-addressed JSON reads 404 with wording identical to an absent profile.
 - **Nothing of his is deleted.** Toggling is not a rebuild trigger, so his program, sessions, assessments, challenges and Garmin preference survive the round trip untouched; flipping it back restores his plan exactly.

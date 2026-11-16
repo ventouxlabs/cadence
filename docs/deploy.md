@@ -245,7 +245,7 @@ New Proxy Host:
 |---|---|
 | Domain Names | `cadence.grepon.cc` |
 | Scheme | `http` |
-| Forward Hostname / IP | **whatever the publish is bound to** — the host half of `docker compose port cadence 8000`. `192.168.1.21` on a default `0.0.0.0` bind; VM-201's Tailscale address once §5 narrows it |
+| Forward Hostname / IP | **whatever the publish is bound to** — the host half of `docker compose port cadence 8000`. `192.168.1.21` on a `0.0.0.0` bind (no longer the default); VM-201's Tailscale address once §5 narrows it |
 | Forward Port | `8090` (the **host** port, not the container's 8000) |
 | Cache Assets | **off** |
 | Block Common Exploits | **on** |
@@ -254,7 +254,7 @@ New Proxy Host:
 | Access List | optional, §5 |
 
 **The forward address has to be one the publish is bound to.** §5 narrows the bind from
-`0.0.0.0` to a Tailscale address, and **VM-201 is in that narrowed state** —
+`127.0.0.1` (or whatever was set) to a Tailscale address, and **VM-201 is in that narrowed state** —
 `CADENCE_BIND_ADDR=100.74.76.39`, with `docker compose port cadence 8000` answering
 `100.74.76.39:8090` and `192.168.1.21:8090` returning nothing at all. Checked on the host
 2026-09-11 (D-282), not inferred; `https://cadence.grepon.cc` answers 200 through the proxy, so
@@ -308,7 +308,7 @@ Guards, in order of preference:
 D-257c records `CADENCE_BIND_ADDR=100.74.76.39` set and verified there on 2026-09-07, with
 `192.168.1.21:8090` refusing and `100.74.76.39:8090` answering. What follows is how it was
 closed, and what a fresh install still has to do. `docker-compose.yml` publishes
-`${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000`, so adding this to `.env` and running `make deploy`
+`${CADENCE_BIND_ADDR:-127.0.0.1}:8090:8000`, so adding this to `.env` and running `make deploy`
 binds the port to the Tailscale interface only:
 
 ```dotenv
@@ -316,13 +316,14 @@ CADENCE_BIND_ADDR=100.x.y.z    # VM-201's Tailscale address, from `tailscale ip 
 ```
 
 Then verify from a non-Tailscale LAN address that `192.168.1.21:8090` is refused, the same way
-§5's step 2 says to verify the access list actually denies. **The default is `0.0.0.0`**, which
-is what a deploy publishes until somebody sets this — the gap is closed by the operator, not by
-the repo.
+§5's step 2 says to verify the access list actually denies. **The default is `127.0.0.1`**, so the
+port is not on the LAN until somebody says otherwise. Remote access (NPM, Tailscale) needs
+`CADENCE_BIND_ADDR` set explicitly in `.env`; with the default, a containerised NPM forwarding to
+the host's LAN or Tailscale address gets a 502. The in-container uvicorn host stays `0.0.0.0`.
 
-Two things not to do. **Do not use `127.0.0.1`**: NPM runs on this host but is containerised, so
-it reaches Cadence over a host interface and never over the host's loopback — a loopback-only
-bind 502s the proxy. Whatever address you do bind, put that same one in NPM's Forward Hostname
+Two things not to do. **Do not leave the default when NPM fronts Cadence**: NPM runs on this host but is
+containerised, so it reaches Cadence over a host interface and never over the host's loopback — the loopback
+default 502s the proxy until `CADENCE_BIND_ADDR` names the Tailscale address. Whatever address you do bind, put that same one in NPM's Forward Hostname
 field (§4). And **do not add a
 `ports` entry to `docker-compose.prod.yml`**: compose *appends* `ports` across `-f` files rather
 than overriding them, so the base mapping stays published alongside the new one and the two
