@@ -156,7 +156,7 @@ def prepare(
 
     try:
         parsed = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, ValueError) as exc:
         # The reason, never the traceback and never the document: ``problem`` is PyYAML's own
         # one-line description and carries no payload of ours.
         reason = getattr(exc, "problem", None) or "it is not valid YAML or JSON"

@@ -37,6 +37,14 @@ async def test_import_malformed_text(seeded_client: httpx.AsyncClient) -> None:
     assert "cadence/" not in response.text
 
 
+async def test_import_impossible_date_is_a_parse_error(seeded_client: httpx.AsyncClient) -> None:
+    """PyYAML raises a bare ValueError for a well-formed but impossible timestamp scalar."""
+    response = await seeded_client.post("/api/import", json={"text": "created: 2024-13-45\n", "profile": "me"})
+    assert response.status_code == 422
+    assert "parse_error" in codes_of(response.json())
+    assert "Traceback" not in response.text
+
+
 async def test_import_multi_document(seeded_client: httpx.AsyncClient) -> None:
     """Test 7."""
     two = f"{doc.ADULT_WORKOUT}---\n{doc.ADULT_WORKOUT}"

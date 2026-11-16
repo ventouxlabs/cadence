@@ -55,7 +55,7 @@ class _Collector:
 def _read_yaml(path: Path, problems: _Collector) -> dict[str, Any] | None:
     try:
         parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+    except (OSError, yaml.YAMLError, ValueError) as exc:
         problems.add(path.name, f"could not be read: {exc}")
         return None
     if not isinstance(parsed, dict):
