@@ -17,9 +17,9 @@ services:
       # The bind address is a variable and the mapping stays a *single* entry, because compose
       # appends `ports` across -f files rather than overriding them: a restricted mapping added
       # in an overlay would publish both, leaving 0.0.0.0 open and colliding on the port (D-206).
-      # Default 0.0.0.0 keeps today's behaviour; set CADENCE_BIND_ADDR to VM-201's Tailscale
-      # address in the VM's .env to stop LAN clients reaching Cadence past NPM's access list.
-      - "${CADENCE_BIND_ADDR:-0.0.0.0}:8090:8000"
+      # Default 127.0.0.1: the API has no login, so a fresh install must not be on the LAN.
+      # Remote access needs CADENCE_BIND_ADDR set explicitly (VM-201's Tailscale address) in .env.
+      - "${CADENCE_BIND_ADDR:-127.0.0.1}:8090:8000"
     # Secrets live only here. .env is git-ignored; .env.example is committed with blank tokens.
     env_file: .env
     environment:
