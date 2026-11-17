@@ -190,7 +190,7 @@ async def test_adjust_on_a_distance_row_is_rejected(seeded_client: httpx.AsyncCl
 
 async def test_row_write_rejects_an_unknown_field(seeded_client: httpx.AsyncClient) -> None:
     sid = (await _today(seeded_client))["session_id"]
-    response = await seeded_client.post(f"/api/sessions/{sid}/rows/1", json={"sets_done": 9})
+    response = await seeded_client.post(f"/api/sessions/{sid}/rows/1", json={"bogus_field": 9})
     assert response.status_code == 422
 
 
