@@ -29,6 +29,8 @@ from cadence.seance.today import RowView, SessionView
 # rewrote an honest number, and the row can still be ticked either way (D-082).
 MIN_REPS = 0
 MAX_REPS = 200
+MAX_SETS = 100
+MAX_SECONDS = 3600
 LOAD_EPSILON = 1e-9
 
 Field = Literal["reps", "load"]
@@ -295,11 +297,12 @@ def apply_patch(
     if is_stale(row.record, ts):
         return result
 
-    if "reps_done" in patch and patch["reps_done"] is not None:
+    for key, upper in (("sets_done", MAX_SETS), ("reps_done", MAX_REPS), ("seconds_done", MAX_SECONDS)):
+        if patch.get(key) is None:
+            continue
         if not row.adjustable:
             raise TickError("a distance row is ticked, not adjusted; the planned distance is what counts")
-        value = max(MIN_REPS, min(MAX_REPS, int(patch["reps_done"])))
-        row.record.reps_done = value
+        setattr(row.record, key, max(MIN_REPS, min(upper, int(patch[key]))))
         result = TickResult(row=_stage(db, view, row.record), changed=True)
 
     if "load_done_kg" in patch and patch["load_done_kg"] is not None:
