@@ -183,6 +183,34 @@ def test_time_row_sends_reps_one_and_seconds() -> None:
     assert entry["sets"] == 3
 
 
+def test_sets_done_without_a_tick_is_exported_and_zero_sets_is_not() -> None:
+    """Pins the intended behaviour: logged sets count as done even when the row was never ticked."""
+    rows = [_row(1, SQUAT, done=False, sets_done=2), _row(2, PLANK, done=False, sets_done=0)]
+
+    payload = _build(rows)
+
+    assert [entry["name"] for entry in payload["exercises"]] == ["Goblet Squat"]
+    assert payload["exercises"][0]["sets"] == 2
+
+
+@pytest.mark.parametrize(("push_son", "expected_push"), [(True, True), (False, False)])
+def test_youth_sets_done_row_follows_the_household_push_flag(push_son: bool, expected_push: bool) -> None:
+    """A youth row that only has sets_done is exported, and goes to Garmin only under push_son_to_garmin.
+
+    Exporting it is deliberate: the household opted the son in with that flag, and an unticked row
+    with logged sets is something he did. With the flag off the body still carries the row for
+    VitalForge but never asks for a Garmin push or a garmin_target.
+    """
+    profile = Profile(id="son", display_name="S", kind="youth", push_to_garmin=False)
+    settings = DEFAULT_SETTINGS.with_changes(push_son_to_garmin=push_son)
+
+    payload = _build([_row(1, SQUAT, done=False, sets_done=3)], profile=profile, settings=settings)
+
+    assert len(payload["exercises"]) == 1
+    assert payload["push_to_garmin"] is expected_push
+    assert ("garmin_target" in payload) is expected_push
+
+
 @pytest.mark.parametrize(
     ("kind", "push_son", "profile_flag", "expected_push", "expects_target"),
     [
