@@ -69,7 +69,9 @@ class RowPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     done: StrictBool | None = None
+    sets_done: StrictInt | None = None
     reps_done: StrictInt | None = None
+    seconds_done: StrictInt | None = None
     load_done_kg: StrictFloat | StrictInt | None = None
     ts: str | None = None
 
