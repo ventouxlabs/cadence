@@ -30,6 +30,7 @@ from cadence.programme.context import make_context
 from cadence.programme.tables import DONE as PLANNED_DONE
 from cadence.programme.tables import PLANNED, PlannedSession
 from cadence.schema.enums import AssessmentId
+from cadence.seance.today import next_planned
 from cadence.seance.untouched import discard_untouched_copy, has_started_session
 
 logger = logging.getLogger(__name__)
@@ -254,23 +255,8 @@ def card_due(db: Session, profile: Profile, today: date | None = None) -> bool:
         return False
     if bilan.baseline_on(db, profile.id) is None:
         return True
-    statement = (
-        select(PlannedSession)
-        .where(PlannedSession.profile_id == profile.id, PlannedSession.status == PLANNED)
-        .order_by(PlannedSession.week, PlannedSession.day_index)  # type: ignore[arg-type]
-    )
-    head = db.exec(statement).first()
+    head = next_planned(db, profile.id)
     return head is not None and head.day_type == ASSESSMENT_DAY
-
-
-def _queued_head(db: Session, profile_id: str) -> PlannedSession | None:
-    """The session Today would render next. Ordered exactly as ``seance.today._next_planned``."""
-    statement = (
-        select(PlannedSession)
-        .where(PlannedSession.profile_id == profile_id, PlannedSession.status == PLANNED)
-        .order_by(PlannedSession.week, PlannedSession.day_index)  # type: ignore[arg-type]
-    )
-    return db.exec(statement).first()
 
 
 def ensure_retest_queued(
@@ -328,7 +314,7 @@ def ensure_retest_queued(
     # 6.2 week scheme has nothing to say about a day that prescribes no training load.
     rows = materialise_rows(template, 1, profile, settings, library)
 
-    head = _queued_head(db, profile.id)
+    head = next_planned(db, profile.id)
     # Immediately before whatever Today would otherwise have rendered, so the retest is the next
     # thing the person does. A negative ``day_index`` is fine for ordering and is renormalised by
     # the next ``restart_block``; the row belongs to the profile's own program, so a settings

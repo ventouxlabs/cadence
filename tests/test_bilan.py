@@ -36,6 +36,7 @@ from cadence.programme.context import make_context
 from cadence.programme.selection import counted_rows
 from cadence.programme.tables import PLANNED, SKIPPED, PlannedSession
 from cadence.schema.enums import AgeBand, AssessmentId, Pattern
+from cadence.seance.today import next_planned
 from cadence.vitalforge.tables import MetricsCache
 from tests.e2e.test_setup import BANNED_BARE_WORDS, BANNED_PHRASES
 
@@ -575,3 +576,24 @@ def test_adding_the_carry_set_drops_the_stale_copy_of_an_untouched_session(
     assert rewritten, "the carry set was added to no opened session"
     for key in rewritten:
         assert _copies_over(db_session, key) == [], "the stale copy of the carry rows survived"
+
+
+def test_the_retest_is_queued_immediately_before_todays_queue_head(
+    seeded: Any, db_session: DbSession, library: Any
+) -> None:
+    """Bilan and Today share one queue-head query, so the retest lands right before Today's next."""
+    me = db_session.get(Profile, PROFILE_ME)
+    assert me is not None
+    _save(db_session, me, library, ADULT_PASS)
+    overdue = BASELINE + timedelta(days=RETEST_DAYS)
+    head = next_planned(db_session, PROFILE_ME)
+    assert head is not None
+
+    queued_id = ensure_retest_queued(db_session, me, library, DEFAULT_SETTINGS, overdue)
+
+    queued = db_session.get(PlannedSession, queued_id)
+    assert queued is not None
+    assert (queued.week, queued.day_index) == (head.week, head.day_index - 1)
+    new_head = next_planned(db_session, PROFILE_ME)
+    assert new_head is not None and new_head.id == queued_id
+    assert card_due(db_session, me, overdue) is (new_head.day_type == "assessment")

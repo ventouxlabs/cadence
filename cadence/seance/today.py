@@ -149,7 +149,12 @@ def normalise_profile_key(raw: str | None) -> str:
     return key
 
 
-def _next_planned(db: Session, profile_id: str) -> PlannedSession | None:
+def next_planned(db: Session, profile_id: str) -> PlannedSession | None:
+    """The queue head: the earliest still-planned session, ordered by (week, day_index).
+
+    Shared with ``bilan.service`` so the retest is queued, and the Assessment card shown, against
+    the same session Today would render next.
+    """
     statement = (
         select(PlannedSession)
         .where(PlannedSession.profile_id == profile_id, PlannedSession.status == PLANNED)
@@ -303,7 +308,7 @@ def resolve_today(db: Session, raw_profile: str | None) -> TodayView:
     missing: list[str] = []
     for profile_id in _profile_ids(profile_key):
         profile = db.get(Profile, profile_id)
-        planned = _next_planned(db, profile_id) if profile is not None else None
+        planned = next_planned(db, profile_id) if profile is not None else None
         if profile is None or planned is None:
             missing.append(profile.display_name if profile is not None else profile_id)
             continue
