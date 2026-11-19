@@ -389,3 +389,50 @@ def test_a_youth_challenge_row_carries_the_youth_bump_order(aged_son: Any, db_se
     assert built, "no section 7.7 row is offerable to this band, so the check would be vacuous"
     for row in built:
         assert row["progression"]["allow_load_progression"] is False, row["exercise_id"]
+
+
+def _copies_over(db, planned_id: str) -> list[SessionRecord]:
+    return list(db.exec(select(SessionRecord).where(SessionRecord.planned_session_id == planned_id)).all())
+
+
+def test_autoregulating_the_next_session_drops_its_stale_rendered_copy(db_session, seeded) -> None:
+    """D-093: the target was opened (rendered) but never ticked; rewriting it must drop that copy."""
+    from cadence.seance.today import ensure_session
+
+    _finish_today(db_session)  # clear the assessment day off the head of the queue.
+    view = resolve_today(db_session, PROFILE_ME).primary
+    queue = [planned for planned in _planned(db_session) if planned.status == PLANNED and planned.id != view.planned.id]
+    target = next(planned for planned in queue if planned.day_type == view.planned.day_type)
+    ensure_session(db_session, target)
+    db_session.commit()
+    before = target.rows_json
+    assert _copies_over(db_session, target.id), "the target should be rendered before the rewrite"
+
+    _finish_today(db_session, felt="easy")
+
+    db_session.expire_all()
+    assert db_session.get(PlannedSession, target.id).rows_json != before, "the target was not rewritten"
+    assert _copies_over(db_session, target.id) == [], "the stale copy of the rewritten rows survived"
+
+
+def test_a_block_restart_drops_the_stale_rendered_copies(db_session, seeded, library) -> None:
+    """D-093: ``restart_block`` lightens every remaining session; each rendered copy has to go with its rows."""
+    from cadence.seance.today import ensure_session
+
+    queue = _planned(db_session)
+    _record_finished(db_session, queue[0], NOW - timedelta(days=RESTART_AFTER_DAYS + 6))
+    opened = [planned for planned in queue[1:4] if planned.status == PLANNED]
+    for planned in opened:
+        ensure_session(db_session, planned)
+    db_session.commit()
+    before = _rows_json(db_session, PROFILE_ME)
+    profile, ctx = _context(db_session, library)
+
+    restart_block(db_session, profile, ctx)
+    db_session.commit()
+
+    db_session.expire_all()
+    rewritten = [p for p in opened if db_session.get(PlannedSession, p.id).rows_json != before[p.id]]
+    assert rewritten, "no opened session was lightened, so the test would pass vacuously"
+    for planned in rewritten:
+        assert _copies_over(db_session, planned.id) == [], "the stale copy of the lightened rows survived"

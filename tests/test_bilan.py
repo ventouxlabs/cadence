@@ -474,3 +474,104 @@ def test_a_skipped_retest_comes_back_the_next_day(seeded: Any, db_session: DbSes
         "the skipped row blocked the next retest for ever"
     )
     assert card_due(db_session, me, tomorrow) is True
+
+
+def test_a_rendered_but_untouched_head_shows_the_challenge_row_after_a_retest_save(
+    seeded: Any, db_session: DbSession, library: Any
+) -> None:
+    """D-093 on a retest day: Today opens a session over the head, then the retest is queued ahead of it.
+
+    Saving the battery rewrites that displaced head's ``rows_json``. Its session was only rendered,
+    never ticked, so the rewrite is allowed - but the ``session_row`` copies Today took on first
+    render must go with it, or the checklist keeps showing the old rows and the challenge row never
+    appears.
+    """
+    from cadence.seance.tables import SessionRecord, SessionRowRecord
+    from cadence.seance.today import ensure_session
+
+    me = db_session.get(Profile, PROFILE_ME)
+    assert me is not None
+    _save(db_session, me, library, ADULT_PASS)  # the baseline: no gaps, and it closes the assessment day
+    head = _planned(db_session, PROFILE_ME)[0]
+    assert head.day_type == "lower_a", "the block should now open on lower_a"
+    opened = ensure_session(db_session, head)
+
+    overdue = BASELINE + timedelta(days=RETEST_DAYS)
+    assert ensure_retest_queued(db_session, me, library, DEFAULT_SETTINGS, overdue) is not None
+    _save(db_session, me, library, {**ADULT_PASS, "plank_s": 20.0}, on=overdue)
+
+    db_session.expire_all()
+    planned = db_session.get(PlannedSession, head.id)
+    assert planned is not None
+    assert any(row.get("is_challenge") for row in parse_rows(planned)), "the challenge never reached the head"
+    for record in db_session.exec(select(SessionRecord).where(SessionRecord.planned_session_id == head.id)).all():
+        copies = db_session.exec(select(SessionRowRecord).where(SessionRowRecord.session_id == record.id)).all()
+        assert len(copies) == len(parse_rows(planned)), "Today would keep showing its stale copy of the rows"
+    assert opened.id  # the session existed before the save
+
+
+def _copies_over(db: DbSession, planned_id: str) -> list[Any]:
+    from cadence.seance.tables import SessionRecord
+
+    return list(db.exec(select(SessionRecord).where(SessionRecord.planned_session_id == planned_id)).all())
+
+
+def test_clearing_a_challenge_drops_the_stale_copy_of_an_untouched_session(
+    seeded: Any, db_session: DbSession, library: Any
+) -> None:
+    """D-093: ``clear_challenge_rows`` rewrites ``rows_json``, so the first-render copy has to go."""
+    from cadence.seance.today import ensure_session
+
+    me = db_session.get(Profile, PROFILE_ME)
+    assert me is not None
+    _save(db_session, me, library, {**ADULT_PASS, "push_up_max": 6.0})
+    carrying = next(
+        item for item in _planned(db_session, PROFILE_ME) if any(r.get("is_challenge") for r in parse_rows(item))
+    )
+    ensure_session(db_session, carrying)
+    db_session.commit()
+    assert _copies_over(db_session, carrying.id), "the session should exist before the clear"
+
+    _save(db_session, me, library, ADULT_PASS)  # no gap now: the challenge row is cleared, none re-placed
+
+    db_session.expire_all()
+    planned = db_session.get(PlannedSession, carrying.id)
+    assert planned is not None
+    assert not any(row.get("is_challenge") for row in parse_rows(planned)), "the challenge row was not cleared"
+    assert _copies_over(db_session, carrying.id) == [], "the stale copy of the cleared rows survived"
+
+
+def test_adding_the_carry_set_drops_the_stale_copy_of_an_untouched_session(
+    seeded: Any, db_session: DbSession, library: Any
+) -> None:
+    """D-093: ``add_carry_set`` bumps a carry row's sets in ``rows_json``; the rendered copy must not outlive it."""
+    from cadence.seance.today import ensure_session
+
+    me = db_session.get(Profile, PROFILE_ME)
+    assert me is not None
+    ctx = make_context(me, DEFAULT_SETTINGS, library)
+    carry_day_sessions = [
+        item
+        for item in _planned(db_session, PROFILE_ME)
+        if any(
+            (ex := ctx.library.exercises.get(str(r.get("exercise_id") or ""))) is not None
+            and ex.pattern is Pattern.CARRY
+            for r in parse_rows(item)
+        )
+    ]
+    assert carry_day_sessions, "no session carries a carry row, so the test would pass vacuously"
+    opened = {item.id: item.rows_json for item in carry_day_sessions}
+    for item in carry_day_sessions:
+        ensure_session(db_session, item)
+    db_session.commit()
+
+    _trend(db_session, PROFILE_ME, 11)
+    _save(db_session, me, library, ADULT_PASS)
+
+    db_session.expire_all()
+    rewritten = [
+        key for key, before in opened.items() if (p := db_session.get(PlannedSession, key)) and p.rows_json != before
+    ]
+    assert rewritten, "the carry set was added to no opened session"
+    for key in rewritten:
+        assert _copies_over(db_session, key) == [], "the stale copy of the carry rows survived"

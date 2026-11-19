@@ -18,7 +18,7 @@ import json
 import logging
 from collections.abc import Mapping
 
-from sqlalchemy import delete, exists, or_, update
+from sqlalchemy import delete, exists, update
 from sqlmodel import Session, select
 
 from cadence.programme.tables import PLANNED, PlannedSession
@@ -26,6 +26,7 @@ from cadence.schema.enums import DayType
 from cadence.schema.exercise import Exercise
 from cadence.schema.workout import Workout, WorkoutRow
 from cadence.seance.tables import SessionRecord, SessionRowRecord
+from cadence.seance.untouched import started_clause
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +107,7 @@ def _eligible_ids(profile_id: str, day_type: str):
     the condition is a correlated ``NOT EXISTS`` rather than a column test.
     """
     touched = (
-        select(SessionRecord.id)
-        .where(SessionRecord.planned_session_id == PlannedSession.id)
-        .where(or_(SessionRecord.started_at.is_not(None), SessionRecord.finished_at.is_not(None)))  # type: ignore[union-attr]
+        select(SessionRecord.id).where(SessionRecord.planned_session_id == PlannedSession.id).where(started_clause())
     )
     return (
         select(PlannedSession.id)

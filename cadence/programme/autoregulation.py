@@ -41,6 +41,7 @@ from cadence.programme.tables import PLANNED, PlannedSession
 from cadence.seance.catalog import display_unit, library_bundle, load_settings
 from cadence.seance.status import completion
 from cadence.seance.tables import SessionRecord, SessionRowRecord
+from cadence.seance.untouched import discard_untouched_copy, has_started_session
 from cadence.validateur import validate_workout
 
 logger = logging.getLogger(__name__)
@@ -94,20 +95,6 @@ def gather_input(
 # ----------------------------------------------------------------------------------- the target
 
 
-def _has_work(db: Session, planned_id: str) -> bool:
-    """Whether somebody has already started ticking this planned session.
-
-    D-024 creates the session on the first *render*, so "a session exists" is the normal state of
-    a checklist that has only been looked at. ``started_at`` is what moves on the first tick, and
-    a checklist with a tick on it is never rewritten underneath the person doing it (risk 4).
-    """
-    statement = select(SessionRecord).where(
-        SessionRecord.planned_session_id == planned_id,
-        SessionRecord.started_at.is_not(None),  # type: ignore[union-attr]
-    )
-    return db.exec(statement).first() is not None
-
-
 def next_of_day_type(db: Session, profile_id: str, finished: PlannedSession) -> PlannedSession | None:
     """The next untouched ``planned`` session of the same day type, in queue order."""
     statement = (
@@ -122,7 +109,7 @@ def next_of_day_type(db: Session, profile_id: str, finished: PlannedSession) -> 
     for candidate in db.exec(statement).all():
         if candidate.id == finished.id or (candidate.week, candidate.day_index) <= (finished.week, finished.day_index):
             continue
-        if not _has_work(db, candidate.id):
+        if not has_started_session(db, candidate.id):
             return candidate
     return None
 
@@ -248,12 +235,13 @@ def restart_block(db: Session, profile: Profile, ctx: BuildContext) -> str:
         .where(PlannedSession.profile_id == profile.id, PlannedSession.status == PLANNED)
         .order_by(PlannedSession.week, PlannedSession.day_index)
     )
-    remaining = [row for row in db.exec(statement).all() if not _has_work(db, row.id)]
+    remaining = [row for row in db.exec(statement).all() if not has_started_session(db, row.id)]
     per_week = max(ctx.settings.days_per_week, 1)
     for index, planned in enumerate(remaining):
         rows = [lighten_row(row, _ladder_for(row, ctx)) for row in _parse_rows(planned)]
         if rows_pass_validator(rows, planned, profile, ctx):
             planned.rows_json = json.dumps(rows, sort_keys=True, separators=(",", ":"))
+            discard_untouched_copy(db, planned.id)
         planned.week = min(index // per_week + 1, 4)
         planned.day_index = index % per_week
         db.add(planned)
@@ -287,6 +275,7 @@ def autoregulate_next(db: Session, record: SessionRecord, ctx: BuildContext, pro
         return HOLD_NOTE, "hold"
     target.rows_json = json.dumps(rows, sort_keys=True, separators=(",", ":"))
     db.add(target)
+    discard_untouched_copy(db, target.id)
     note = best_note(moved, decision.outcome, display_unit(ctx.settings), is_youth=ctx.is_youth)
     return note, decision.outcome
 

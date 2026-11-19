@@ -25,7 +25,7 @@ from cadence.programme.context import BuildContext
 from cadence.programme.selection import fit_to_band
 from cadence.programme.tables import PLANNED, PlannedSession
 from cadence.schema.enums import DayType, Measure
-from cadence.seance.tables import SessionRecord
+from cadence.seance.untouched import discard_untouched_copy, has_started_session
 
 logger = logging.getLogger(__name__)
 
@@ -160,14 +160,6 @@ def insert_into(
     return fit_to_band(_renumber(merged), ctx, assessment=assessment)
 
 
-def _started(db: Session, planned_id: str) -> bool:
-    statement = select(SessionRecord).where(
-        SessionRecord.planned_session_id == planned_id,
-        SessionRecord.started_at.is_not(None),  # type: ignore[union-attr]
-    )
-    return db.exec(statement).first() is not None
-
-
 def target_sessions(
     db: Session, profile_id: str, spec: GapRow, limit: int, *, row: dict[str, Any] | None = None
 ) -> list[PlannedSession]:
@@ -194,7 +186,7 @@ def target_sessions(
     )
     found: list[PlannedSession] = []
     for planned in db.exec(statement).all():
-        if planned.day_type not in wanted or _started(db, planned.id):
+        if planned.day_type not in wanted or has_started_session(db, planned.id):
             continue
         # Section 7.7: the wall-angel appendix is suppressed on assessment day so the test it
         # trains is not pre-fatigued by the warm-up that precedes it.
@@ -234,7 +226,7 @@ def clear_challenge_rows(db: Session, profile_id: str, ctx: BuildContext) -> Non
     statement = select(PlannedSession).where(PlannedSession.profile_id == profile_id, PlannedSession.status == PLANNED)
     for planned in db.exec(statement).all():
         rows = parse_rows(planned)
-        if _started(db, planned.id):
+        if has_started_session(db, planned.id):
             continue
         if not any(row.get("is_challenge") or row.get(CARRY_SET_MARK) for row in rows):
             continue
@@ -243,6 +235,7 @@ def clear_challenge_rows(db: Session, profile_id: str, ctx: BuildContext) -> Non
         )
         planned.rows_json = json.dumps(kept, sort_keys=True, separators=(",", ":"))
         db.add(planned)
+        discard_untouched_copy(db, planned.id)
 
 
 def apply_row(db: Session, profile_id: str, row: dict[str, Any], spec: GapRow, ctx: BuildContext, profile: Any) -> int:
@@ -259,6 +252,7 @@ def apply_row(db: Session, profile_id: str, row: dict[str, Any], spec: GapRow, c
             continue
         planned.rows_json = json.dumps(candidate, sort_keys=True, separators=(",", ":"))
         db.add(planned)
+        discard_untouched_copy(db, planned.id)
         placed += 1
     return placed
 
@@ -297,7 +291,7 @@ def add_carry_set(db: Session, profile_id: str, ctx: BuildContext, profile: Any)
     )
     changed = 0
     for planned in db.exec(statement).all():
-        if planned.day_type not in wanted or _started(db, planned.id):
+        if planned.day_type not in wanted or has_started_session(db, planned.id):
             continue
         rows = parse_rows(planned)
         if any(row.get(CARRY_SET_MARK) for row in rows):
@@ -319,5 +313,6 @@ def add_carry_set(db: Session, profile_id: str, ctx: BuildContext, profile: Any)
             continue
         planned.rows_json = json.dumps(updated, sort_keys=True, separators=(",", ":"))
         db.add(planned)
+        discard_untouched_copy(db, planned.id)
         changed += 1
     return changed
