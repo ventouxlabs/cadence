@@ -54,9 +54,18 @@ class RowView:
         return bool(self.spec.get("is_prelude"))
 
     @property
-    def adjustable(self) -> bool:
-        """A distance row is tick-only: ``session_row`` has no metres column (PRP-02 data model)."""
+    def reps_adjustable(self) -> bool:
+        """A distance row's metres are fixed: ``session_row`` has no metres column (PRP-02 data model)."""
         return self.measure != "meters"
+
+    @property
+    def load_adjustable(self) -> bool:
+        """Any row the plan gave a load can step it, whatever it measures; bodyweight rows cannot."""
+        return self.spec.get("load_kg") is not None
+
+    @property
+    def adjustable(self) -> bool:
+        return self.reps_adjustable or self.load_adjustable
 
     @property
     def timed(self) -> bool:

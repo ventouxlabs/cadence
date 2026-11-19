@@ -161,7 +161,7 @@ def test_adjust_load_clamped_to_youth_cap(db_session, aged_son) -> None:
     assert "weight" not in seen[-1].notice.lower()
 
 
-def test_adjust_rejected_on_carry_row(db_session, seeded) -> None:
+def test_adjust_reps_rejected_on_carry_row(db_session, seeded) -> None:
     view = None
     for _ in range(6):
         candidate = _view(db_session)
@@ -172,7 +172,7 @@ def test_adjust_rejected_on_carry_row(db_session, seeded) -> None:
     assert view is not None, "no distance row in the parent's block"
 
     row = next(row for row in view.rows if row.measure == "meters")
-    assert row.adjustable is False
+    assert row.reps_adjustable is False
     with pytest.raises(tick_service.TickError):
         tick_service.adjust(db_session, view, row.position, "reps", 1, DEFAULT_SETTINGS)
 

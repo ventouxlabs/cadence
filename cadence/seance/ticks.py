@@ -213,10 +213,12 @@ def adjust(
     row = view.row(position)
     if row is None:
         raise TickError(f"row {position} is not on this session")
-    if not row.adjustable:
-        raise TickError("a distance row is ticked, not adjusted; the planned distance is what counts")
     if field not in ("reps", "load"):
         raise TickError(f"cannot adjust {field!r}")
+    if field == "reps" and not row.reps_adjustable:
+        raise TickError("a distance row's distance is fixed; only its load can be adjusted")
+    if field == "load" and not row.load_adjustable:
+        raise TickError("this row has no planned load; its load cannot be adjusted")
     if delta == 0:
         return TickResult(row=row, changed=False)
 
@@ -300,8 +302,8 @@ def apply_patch(
     for key, upper in (("sets_done", MAX_SETS), ("reps_done", MAX_REPS), ("seconds_done", MAX_SECONDS)):
         if patch.get(key) is None:
             continue
-        if not row.adjustable:
-            raise TickError("a distance row is ticked, not adjusted; the planned distance is what counts")
+        if not row.reps_adjustable:
+            raise TickError("a distance row's distance is fixed; only its load can be adjusted")
         setattr(row.record, key, max(MIN_REPS, min(upper, int(patch[key]))))
         result = TickResult(row=_stage(db, view, row.record), changed=True)
 
@@ -321,14 +323,12 @@ def apply_patch(
 def _write_load(db: Session, view: SessionView, row: RowView, value: float, previous: TickResult) -> TickResult:
     """Write an absolute load from the JSON API, refusing what the stepper cannot reach.
 
-    Three refusals, because this endpoint is the offline replay target and nothing downstream
-    re-checks it. A distance row has no load column at all. A row the plan gave **no** load is a
+    Two refusals, because this endpoint is the offline replay target and nothing downstream
+    re-checks it. A row the plan gave **no** load is a
     bodyweight movement, and its unit is one the band table has no cap for (D-037a's
     ``youth_load_uncappable``) - so an unguarded write would put any number a client sent on a
     child's session and, from PRP-06, into Garmin. And a load must be a real, non-negative number.
     """
-    if not row.adjustable:
-        raise TickError("a distance row is ticked, not adjusted; the planned distance is what counts")
     if row.spec.get("load_kg") is None:
         raise TickError("this exercise is done at bodyweight; there is no load to record")
     if not isfinite(value) or value < 0:

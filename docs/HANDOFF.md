@@ -241,7 +241,7 @@ The module map, from `docs/architecture.md` §2. French names for the project, s
 
 ## Known limitations
 
-- **Carry rows are tick-only** (PRP-02). A farmer-carry or similar row has no separate reps/load adjust path beyond the tick — its "adjust" affordance doesn't exist yet.
+- **Carry rows adjust load only** (PRP-02). A loaded carry row (e.g. farmer carry 16 kg) shows just the load stepper, through the same ladder and youth `load_cap` as any row. Its distance stays fixed (`session_row` has no metres column), and a bodyweight carry stays tick-only.
 - **Generated workouts are stored but not auto-scheduled** (PRP-08). `/api/generate/accept` writes the workout to the DB; nothing wires it into a profile's rolling plan automatically. Assigning it to a day is the "use for [day type]" adoption flow in PRP-08/PRP-10, which is manual.
 - **The son's readiness nudge is permanently null.** The deployment holds one Garmin credential (the parent's), and the son has no Garmin account, so VitalForge's readiness endpoint returns `insufficient_data` for him forever (`docs/vitalforge-contract.md` §2.3, D-069). The nudge renders as "not available" rather than erroring or coercing to a number — this is by design, not a bug to fix.
 - **The son's body-composition gap check can't fire in practice.** Autoregulation's `body_comp` gap rule reads a derived `muscle_pct` series that only exists for whichever profile has real Garmin body-composition data — i.e., never the son's (D-219d/D-220).
