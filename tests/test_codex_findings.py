@@ -325,7 +325,7 @@ async def test_a_session_started_during_the_swap_is_not_overwritten(
     real_rows_for = adoption.rows_for
     fired: list[str] = []
 
-    def start_a_session_mid_flight(workout, catalog):  # noqa: ANN001, ANN202
+    def start_a_session_mid_flight(workout, catalog, **kwargs):  # noqa: ANN001, ANN202
         """Tick a row after the candidate set would have been snapshotted, before the writes."""
         if not fired:
             fired.append("yes")
@@ -336,7 +336,7 @@ async def test_a_session_started_during_the_swap_is_not_overwritten(
                 record.started_at = "2026-09-06T10:00:00+00:00"
                 other.add(record)
                 other.commit()
-        return real_rows_for(workout, catalog)
+        return real_rows_for(workout, catalog, **kwargs)
 
     monkeypatch.setattr(adoption, "rows_for", start_a_session_mid_flight)
     document = doc.ADULT_WORKOUT.replace("day_type: upper_a", f"day_type: {day_type}")
