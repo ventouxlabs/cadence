@@ -54,6 +54,13 @@ def test_adjust_load_on_a_carry_row_steps_the_ladder(db_session, seeded) -> None
     assert result.row.record.reps_done is None
 
 
+def test_adjust_load_on_a_bodyweight_carry_row_is_refused(db_session, seeded) -> None:
+    view, row = _walk(db_session, PROFILE_SON, _bodyweight_carry)
+    with pytest.raises(tick_service.TickError):
+        tick_service.adjust(db_session, view, row.position, "load", 1, DEFAULT_SETTINGS)
+    assert row.record.load_done_kg is None
+
+
 def test_adjust_reps_on_a_carry_row_is_refused(db_session, seeded) -> None:
     view, row = _walk(db_session, "me", _loaded_carry)
     with pytest.raises(tick_service.TickError):

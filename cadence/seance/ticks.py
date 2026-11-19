@@ -217,6 +217,8 @@ def adjust(
         raise TickError(f"cannot adjust {field!r}")
     if field == "reps" and not row.reps_adjustable:
         raise TickError("a distance row's distance is fixed; only its load can be adjusted")
+    if field == "load" and not row.load_adjustable:
+        raise TickError("this row has no planned load; its load cannot be adjusted")
     if delta == 0:
         return TickResult(row=row, changed=False)
 
