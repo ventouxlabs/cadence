@@ -77,18 +77,19 @@ def prescription(row: Any, unit: str = "kg") -> str:
     row now claims rather than what it was planned as.
     """
     spec = row.spec
-    sets = spec.get("sets") or 1
+    # ``row.sets`` is the stepped count when there is one; an explicit 0 stays 0 (not 1).
+    sets = row.sets if row.sets is not None else 1
     parts: list[str] = []
     if row.reps is not None:
         per_side = " per side" if spec.get("per_side") else ""
-        parts.append(f"{sets} x {row.reps}{per_side} reps" if sets > 1 else f"{row.reps}{per_side} reps")
+        parts.append(f"{sets} x {row.reps}{per_side} reps" if sets != 1 else f"{row.reps}{per_side} reps")
     elif spec.get("seconds") is not None:
-        parts.append(f"{sets} x {spec['seconds']} s" if sets > 1 else f"{spec['seconds']} s")
+        parts.append(f"{sets} x {spec['seconds']} s" if sets != 1 else f"{spec['seconds']} s")
     elif spec.get("meters") is not None:
         metres = f"{float(spec['meters']):g}"
-        parts.append(f"{sets} x {metres} m" if sets > 1 else f"{metres} m")
+        parts.append(f"{sets} x {metres} m" if sets != 1 else f"{metres} m")
     elif spec.get("steps") is not None:
-        parts.append(f"{sets} x {spec['steps']} steps" if sets > 1 else f"{spec['steps']} steps")
+        parts.append(f"{sets} x {spec['steps']} steps" if sets != 1 else f"{spec['steps']} steps")
     load = format_load(row.load_kg, unit)
     if load:
         parts.append(load)

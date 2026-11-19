@@ -11,6 +11,7 @@
   var DB_NAME = "cadence-queue";
   var STORE = "ops";
   var MAX_OPS = 500;
+  var MAX_SETS = 100; /* mirrors seance/ticks.py MAX_SETS */
   /* A 4xx is the server saying no. Retrying it a few times covers a transient rejection; past
      that the entry is parked, kept, and reported, so nothing is dropped in silence. */
   var MAX_ATTEMPTS = 5;
@@ -298,20 +299,26 @@
     if (!form || navigator.onLine) return;
     event.preventDefault();
     event.stopPropagation();
-    var output = form.querySelector("[data-reps]");
-    if (button.name !== "reps" || !output) {
+    var field = button.name === "sets" ? "sets" : button.name === "reps" ? "reps" : null;
+    var output = field && form.querySelector("[data-" + field + "]");
+    if (!field || !output) {
       /* A load step needs the household ladder and the band cap, and both live on the server on
          purpose (D-081). Guessing a rung offline is how an over-cap load reaches a child's row. */
-      notice(form, "Load changes need the connection. Reps and ticks work offline.");
+      notice(form, "Load changes need the connection. Sets, reps and ticks work offline.");
       return;
     }
-    var next = Math.max(1, parseInt(output.textContent, 10) + (button.value === "-1" ? -1 : 1));
+    var delta = button.value === "-1" ? -1 : 1;
+    var current = parseInt(output.textContent, 10);
+    /* Sets may step down to 0 and up to MAX_SETS (ticks.py); reps keep their floor of 1 offline. */
+    var next = field === "sets" ? Math.max(0, Math.min(MAX_SETS, current + delta)) : Math.max(1, current + delta);
     output.textContent = String(next);
+    var patch = { ts: new Date().toISOString() };
+    patch[field === "sets" ? "sets_done" : "reps_done"] = next;
     enqueue({
       session_id: form.getAttribute("data-session"),
       kind: "row",
       position: parseInt(form.getAttribute("data-row"), 10),
-      patch: { reps_done: next, ts: new Date().toISOString() }
+      patch: patch
     }).then(showBanner);
   }
 
