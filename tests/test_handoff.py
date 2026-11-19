@@ -215,6 +215,6 @@ def test_the_install_section_promises_no_app_store() -> None:
 def test_the_known_limitations_name_the_three_the_prp_requires() -> None:
     """PRP-10 section 9 names these three by hand; a limitations list without them is decorative."""
     section = _section(HANDOFF, "## Known limitations").lower()
-    assert "carry rows are tick-only" in section
+    assert "carry rows adjust load only" in section
     assert "not auto-scheduled" in section
     assert "readiness" in section and "null" in section

@@ -49,7 +49,7 @@
   </span>
   {% if expanded %}
   <div class="stepper-panel">
-    {% if row.reps is not none %}
+    {% if row.reps_adjustable and row.reps is not none %}
     <div class="stepper" role="group" aria-label="Reps done">
       <span class="stepper-label">reps</span>
       <button type="submit" class="step" name="reps" value="-1" aria-label="One rep fewer" formaction="{{ adjust_url }}"
@@ -59,7 +59,7 @@
               hx-post="{{ adjust_url }}" hx-vals='{"reps": "1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#43;</button>
     </div>
     {% endif %}
-    {% if row.load_kg is not none %}
+    {% if row.load_adjustable and row.load_kg is not none %}
     <div class="stepper" role="group" aria-label="Load used">
       <span class="stepper-label">load</span>
       <button type="submit" class="step" name="load" value="-1" aria-label="One rung lighter" formaction="{{ adjust_url }}"
