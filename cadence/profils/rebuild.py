@@ -37,7 +37,8 @@ from cadence.profils.settings import ProgramSettings
 from cadence.profils.tables import Profile
 from cadence.programme.builder import build_program, program_id
 from cadence.programme.tables import PLANNED, SKIPPED, PlannedSession, Program
-from cadence.seance.tables import SessionRecord, SessionRowRecord
+from cadence.seance.tables import SessionRecord
+from cadence.seance.untouched import discard_records, is_started
 
 logger = logging.getLogger(__name__)
 
@@ -51,19 +52,6 @@ def _sessions_by_planned(session: Session, profile_id: str) -> dict[str, list[Se
     for row in rows:
         grouped.setdefault(row.planned_session_id, []).append(row)
     return grouped
-
-
-def _started(record: SessionRecord) -> bool:
-    """Whether anyone has actually worked on this session, as opposed to merely opening it."""
-    return record.started_at is not None or record.finished_at is not None
-
-
-def _discard(session: Session, records: list[SessionRecord]) -> None:
-    """Drop an untouched session and its rows, so re-planning leaves nothing pointing at nothing."""
-    for record in records:
-        for row in session.exec(select(SessionRowRecord).where(SessionRowRecord.session_id == record.id)).all():
-            session.delete(row)
-        session.delete(record)
 
 
 def _free_id(natural: str, taken: set[str]) -> str:
@@ -133,12 +121,12 @@ def rebuild_one(
 
     rows = session.exec(select(PlannedSession).where(PlannedSession.program_id == identifier)).all()
     attached = _sessions_by_planned(session, profile.id)
-    kept = [row for row in rows if row.status != PLANNED or any(map(_started, attached.get(row.id, ())))]
+    kept = [row for row in rows if row.status != PLANNED or any(map(is_started, attached.get(row.id, ())))]
     kept_ids = {row.id for row in kept}
 
     for row in rows:
         if row.id not in kept_ids:
-            _discard(session, attached.get(row.id, []))
+            discard_records(session, attached.get(row.id, []))
             session.delete(row)
     session.flush()
 

@@ -30,7 +30,7 @@ from cadence.programme.context import make_context
 from cadence.programme.tables import DONE as PLANNED_DONE
 from cadence.programme.tables import PLANNED, PlannedSession
 from cadence.schema.enums import AssessmentId
-from cadence.seance.tables import SessionRecord, SessionRowRecord
+from cadence.seance.untouched import discard_untouched_copy, has_started_session
 
 logger = logging.getLogger(__name__)
 
@@ -233,18 +233,9 @@ def close_assessment_session(db: Session, profile_id: str) -> str | None:
     planned = db.exec(statement).first()
     if planned is None:
         return None
-    open_sessions = db.exec(
-        select(SessionRecord).where(
-            SessionRecord.planned_session_id == planned.id,
-            SessionRecord.finished_at.is_(None),  # type: ignore[union-attr]
-        )
-    ).all()
-    if any(record.started_at is not None for record in open_sessions):
+    if has_started_session(db, planned.id):
         return None
-    for record in open_sessions:
-        for row in db.exec(select(SessionRowRecord).where(SessionRowRecord.session_id == record.id)).all():
-            db.delete(row)
-        db.delete(record)
+    discard_untouched_copy(db, planned.id)
     planned.status = PLANNED_DONE
     db.add(planned)
     return planned.id

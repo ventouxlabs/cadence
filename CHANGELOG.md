@@ -4,6 +4,9 @@ All notable changes to Cadence. Format follows Keep a Changelog; one entry per P
 
 ## [Unreleased]
 
+### untouched-session rule (2026-11-18)
+- D-093's "may this planned session be rewritten" rule now lives once, in `cadence/seance/untouched.py`, and the five copies (autoregulation, bilan rows and service, profile rebuild, workout adoption) call it. "Started" is `started_at` or `finished_at` everywhere. Fix: a retest-day battery save, challenge clear, carry-set add, or autoregulation rewrite of a rendered-but-untouched session now drops its stale first-render `session_row` copies, so Today shows the new rows (the challenge row used to be missing).
+
 ### bind default (2026-11-16)
 - Breaking for fresh installs: the compose port now binds `127.0.0.1` by default (D-287); set `CADENCE_BIND_ADDR` before NPM can reach Cadence. VM-201 already sets it.
 

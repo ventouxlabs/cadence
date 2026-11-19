@@ -474,3 +474,37 @@ def test_a_skipped_retest_comes_back_the_next_day(seeded: Any, db_session: DbSes
         "the skipped row blocked the next retest for ever"
     )
     assert card_due(db_session, me, tomorrow) is True
+
+
+def test_a_rendered_but_untouched_head_shows_the_challenge_row_after_a_retest_save(
+    seeded: Any, db_session: DbSession, library: Any
+) -> None:
+    """D-093 on a retest day: Today opens a session over the head, then the retest is queued ahead of it.
+
+    Saving the battery rewrites that displaced head's ``rows_json``. Its session was only rendered,
+    never ticked, so the rewrite is allowed - but the ``session_row`` copies Today took on first
+    render must go with it, or the checklist keeps showing the old rows and the challenge row never
+    appears.
+    """
+    from cadence.seance.tables import SessionRecord, SessionRowRecord
+    from cadence.seance.today import ensure_session
+
+    me = db_session.get(Profile, PROFILE_ME)
+    assert me is not None
+    _save(db_session, me, library, ADULT_PASS)  # the baseline: no gaps, and it closes the assessment day
+    head = _planned(db_session, PROFILE_ME)[0]
+    assert head.day_type == "lower_a", "the block should now open on lower_a"
+    opened = ensure_session(db_session, head)
+
+    overdue = BASELINE + timedelta(days=RETEST_DAYS)
+    assert ensure_retest_queued(db_session, me, library, DEFAULT_SETTINGS, overdue) is not None
+    _save(db_session, me, library, {**ADULT_PASS, "plank_s": 20.0}, on=overdue)
+
+    db_session.expire_all()
+    planned = db_session.get(PlannedSession, head.id)
+    assert planned is not None
+    assert any(row.get("is_challenge") for row in parse_rows(planned)), "the challenge never reached the head"
+    for record in db_session.exec(select(SessionRecord).where(SessionRecord.planned_session_id == head.id)).all():
+        copies = db_session.exec(select(SessionRowRecord).where(SessionRowRecord.session_id == record.id)).all()
+        assert len(copies) == len(parse_rows(planned)), "Today would keep showing its stale copy of the rows"
+    assert opened.id  # the session existed before the save
