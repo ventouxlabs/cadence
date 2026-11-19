@@ -32,7 +32,7 @@
   "use strict";
   var id = (location.pathname.split("/")[2] || "").trim();
   if (!id) return;
-  caches.open("cadence-v2").then(function (cache) {
+  caches.open("cadence-v3").then(function (cache) {
     return cache.keys().then(function (keys) {
       var hit = keys.filter(function (request) { return request.url.indexOf("/api/today") !== -1; });
       if (!hit.length) return null;

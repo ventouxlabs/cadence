@@ -73,6 +73,19 @@ def test_patch_seconds_or_reps_on_a_carry_row_is_refused(db_session, seeded) -> 
         tick_service.apply_patch(db_session, view, row.position, {"reps_done": 5}, DEFAULT_SETTINGS)
 
 
+def test_adjust_sets_on_a_carry_row_and_the_offline_patch_agree(db_session, seeded) -> None:
+    """Online adjust and the queued sets_done patch both accept sets on a metre row."""
+    view, row = _walk(db_session, "me", _loaded_carry)
+    stepped = tick_service.adjust(db_session, view, row.position, "sets", -1, DEFAULT_SETTINGS)
+    assert stepped.changed
+    target = stepped.row.record.sets_done
+
+    view = _walk(db_session, "me", _loaded_carry)[0]
+    patched = tick_service.apply_patch(db_session, view, row.position, {"sets_done": target + 1}, DEFAULT_SETTINGS)
+    assert patched.changed
+    assert patched.row.record.sets_done == target + 1
+
+
 def test_youth_carry_load_never_passes_the_band_cap(db_session, aged_son) -> None:
     view, row = _walk(db_session, PROFILE_SON, _loaded_carry)
     cap = tick_service.load_cap(view, row.spec)

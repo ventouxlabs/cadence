@@ -193,6 +193,15 @@ def test_sets_done_without_a_tick_is_exported_and_zero_sets_is_not() -> None:
     assert payload["exercises"][0]["sets"] == 2
 
 
+def test_ticked_row_stepped_to_zero_sets_is_left_out_of_the_export() -> None:
+    """Zero sets is 'not performed': it must not fall back to the planned count."""
+    rows = [_row(1, SQUAT, done=True, sets_done=0), _row(2, PLANK, done=True)]
+
+    payload = _build(rows)
+
+    assert [entry["name"] for entry in payload["exercises"]] == ["Plank"]
+
+
 @pytest.mark.parametrize(("push_son", "expected_push"), [(True, True), (False, False)])
 def test_youth_sets_done_row_follows_the_household_push_flag(push_son: bool, expected_push: bool) -> None:
     """A youth row that only has sets_done is exported, and goes to Garmin only under push_son_to_garmin.

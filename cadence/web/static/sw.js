@@ -2,7 +2,7 @@
    under /static/ can never control /today, and offline would quietly do nothing.
 
    Bump CACHE_VERSION on every change to this file or to anything it precaches. */
-const CACHE_VERSION = "cadence-v2";
+const CACHE_VERSION = "cadence-v3";
 
 const PRECACHE = [
   "/static/htmx.min.js",

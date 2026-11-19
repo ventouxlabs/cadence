@@ -315,7 +315,7 @@ def apply_patch(
     for key, upper in (("sets_done", MAX_SETS), ("reps_done", MAX_REPS), ("seconds_done", MAX_SECONDS)):
         if patch.get(key) is None:
             continue
-        if not row.reps_adjustable:
+        if key != "sets_done" and not row.reps_adjustable:
             raise TickError("a distance row's distance is fixed; only its load can be adjusted")
         setattr(row.record, key, max(MIN_REPS, min(upper, int(patch[key]))))
         result = TickResult(row=_stage(db, view, row.record), changed=True)
