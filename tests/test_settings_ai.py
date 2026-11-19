@@ -235,6 +235,26 @@ async def test_import_can_be_used_for_a_day_type(ui_client: httpx.AsyncClient, s
         assert [item["exercise_id"] for item in rows] == ["push-up", "db-bent-row", "plank"]
         # Today reads the name and the cue off the spec, not off the exercise table.
         assert all(item["name"] and item["cue"] for item in rows)
+        # An adult's rows keep the adult bump path (section 5.6).
+        assert all(item["progression"] == {"allow_load_progression": True} for item in rows)
+
+
+async def test_an_adopted_youth_workout_carries_the_youth_progression_flag(
+    ui_client: httpx.AsyncClient, settings
+) -> None:
+    """A missing flag reads as True in programme.arithmetic, i.e. the adult bump path (D-218)."""
+    response = await ui_client.post(
+        "/settings/import",
+        data={"text": doc.YOUTH_WORKOUT, "profile": "son", "day_type": "upper_a"},
+    )
+    assert response.status_code == 200, response.text
+    assert "Now used for" in response.text
+    after = planned(settings, "son", DayType.UPPER_A)
+    assert after
+    for row in after:
+        rows = json.loads(row.rows_json)
+        assert rows
+        assert all(item["progression"] == {"allow_load_progression": False} for item in rows)
 
 
 async def test_the_swapped_workout_reaches_today(ui_client: httpx.AsyncClient) -> None:

@@ -241,7 +241,14 @@ def _stored(
     swap_error: str | None = None
     if day_type:
         try:
-            swapped = adoption.adopt(db, workout, profile_id=context.profile.id, day_type=day_type, catalog=catalog)
+            swapped = adoption.adopt(
+                db,
+                workout,
+                profile_id=context.profile.id,
+                day_type=day_type,
+                catalog=catalog,
+                allow_load_progression=context.profile.kind != "youth",
+            )
         except (ValueError, KeyError) as exc:
             swap_error = f"the workout was saved, but it could not be used for that day: {exc}"
     return _render(
@@ -343,7 +350,11 @@ async def generate_section(
             "workout": workout,
             "document": json.dumps(workout.model_dump(mode="json")),
             "profile": context.profile.id,
-            "rows": adoption.rows_for(workout, ingestion.resolved_catalog(context, outcome.prepared)),
+            "rows": adoption.rows_for(
+                workout,
+                ingestion.resolved_catalog(context, outcome.prepared),
+                allow_load_progression=context.profile.kind != "youth",
+            ),
             "day_types": adoption.day_type_choices(),
             "model": outcome.model,
             "attempts": outcome.attempts,

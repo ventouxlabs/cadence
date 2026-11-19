@@ -48,13 +48,14 @@ def day_type_choices() -> tuple[tuple[str, str], ...]:
     return tuple((item.value, day_label(item.value)) for item in ADOPTABLE_DAY_TYPES)
 
 
-def row_spec(position: int, row: WorkoutRow, exercise: Exercise) -> dict[str, object]:
+def row_spec(position: int, row: WorkoutRow, exercise: Exercise, *, allow_load_progression: bool) -> dict[str, object]:
     """One ``rows_json`` entry, shaped exactly as ``materialise._row_dict`` shapes it.
 
     Today reads the name, the cue and the measure off the spec rather than off the exercise
-    table, so a bare ``WorkoutRow`` dump renders a checklist of blank lines. ``progression`` is
-    ``None`` on purpose: ``seance.ticks.load_cap`` computes the band cap live from the rule
-    table, so an absent stored cap narrows nothing.
+    table, so a bare ``WorkoutRow`` dump renders a checklist of blank lines. ``progression`` carries
+    only ``allow_load_progression``: ``programme.arithmetic`` reads a missing flag as True, the
+    adult bump path, so a youth row must say False outright (D-218). ``seance.ticks.load_cap``
+    still computes the band cap live from the rule table.
     """
     return {
         "position": position,
@@ -79,18 +80,20 @@ def row_spec(position: int, row: WorkoutRow, exercise: Exercise) -> dict[str, ob
         "is_challenge": row.is_challenge,
         "assessment_id": None,
         "notes": [],
-        "progression": None,
+        "progression": {"allow_load_progression": allow_load_progression},
     }
 
 
-def rows_for(workout: Workout, catalog: Mapping[str, Exercise]) -> list[dict[str, object]]:
+def rows_for(
+    workout: Workout, catalog: Mapping[str, Exercise], *, allow_load_progression: bool
+) -> list[dict[str, object]]:
     """The whole workout as materialised rows. Every row resolved, or nothing at all."""
     specs: list[dict[str, object]] = []
     for position, row in enumerate(workout.rows, start=1):
         exercise = catalog.get(row.exercise_id)
         if exercise is None:
             raise KeyError(row.exercise_id)
-        specs.append(row_spec(position, row, exercise))
+        specs.append(row_spec(position, row, exercise, allow_load_progression=allow_load_progression))
     return specs
 
 
@@ -128,6 +131,7 @@ def adopt(
     profile_id: str,
     day_type: str,
     catalog: Mapping[str, Exercise],
+    allow_load_progression: bool,
 ) -> int:
     """Swap this workout into every untouched planned session of that day type. Returns the count.
 
@@ -144,7 +148,7 @@ def adopt(
     if day_type not in {item.value for item in ADOPTABLE_DAY_TYPES}:
         raise ValueError(f"{day_type!r} is not a day a workout can be pointed at")
     # Built before the transaction opens: an unresolvable row must raise without having written.
-    payload = json.dumps(rows_for(workout, catalog))
+    payload = json.dumps(rows_for(workout, catalog, allow_load_progression=allow_load_progression))
 
     eligible = _eligible_ids(profile_id, day_type)
     doomed = select(SessionRecord.id).where(SessionRecord.planned_session_id.in_(eligible))  # type: ignore[attr-defined]
