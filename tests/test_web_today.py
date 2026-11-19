@@ -70,6 +70,61 @@ async def test_adjust_route_expands_then_steps(seeded_client: httpx.AsyncClient)
     assert f">{target['reps'] + 1}<" in stepped.text
 
 
+async def test_adjust_route_steps_sets_and_shows_the_stepper(seeded_client: httpx.AsyncClient) -> None:
+    data = await _today(seeded_client)
+    sid = data["session_id"]
+    target = next(row for row in data["rows"] if row["adjustable"])
+    position = target["position"]
+    planned = target["sets"]
+
+    opened = await seeded_client.post(
+        f"/today/{sid}/rows/{position}/adjust?profile=me", data={"expand": "1"}, headers=HX
+    )
+    stepped = await seeded_client.post(
+        f"/today/{sid}/rows/{position}/adjust?profile=me", data={"sets": "-1"}, headers=HX
+    )
+
+    assert 'aria-label="Sets done"' in opened.text
+    assert f'<output class="step-value" data-sets>{planned - 1}</output>' in stepped.text
+    stored = next(r for r in (await _today(seeded_client))["rows"] if r["position"] == position)
+    assert stored["sets_done"] == planned - 1
+
+
+async def test_collapsed_row_line_shows_the_stepped_sets(seeded_client: httpx.AsyncClient) -> None:
+    data = await _today(seeded_client)
+    sid = data["session_id"]
+    target = next(r for r in data["rows"] if r["adjustable"] and r["reps"] is not None)
+    position, planned, reps = target["position"], target["sets"], target["reps"]
+    url = f"/today/{sid}/rows/{position}/adjust?profile=me"
+
+    await seeded_client.post(url, data={"expand": "1"}, headers=HX)
+    await seeded_client.post(url, data={"sets": "1"}, headers=HX)
+    closed = await seeded_client.post(url, data={"expand": "0"}, headers=HX)
+
+    assert f"{planned + 1} x {reps}" in closed.text
+
+
+async def test_collapsed_row_line_keeps_an_explicit_zero_sets(seeded_client: httpx.AsyncClient) -> None:
+    data = await _today(seeded_client)
+    sid = data["session_id"]
+    target = next(r for r in data["rows"] if r["adjustable"] and r["reps"] is not None and r["sets"] == 1)
+    url = f"/today/{sid}/rows/{target['position']}/adjust?profile=me"
+
+    await seeded_client.post(url, data={"expand": "1"}, headers=HX)
+    await seeded_client.post(url, data={"sets": "-1"}, headers=HX)
+    closed = await seeded_client.post(url, data={"expand": "0"}, headers=HX)
+
+    assert f"0 x {target['reps']}" in closed.text
+
+
+async def test_adjust_sets_without_javascript_redirects(seeded_client: httpx.AsyncClient) -> None:
+    data = await _today(seeded_client)
+    sid = data["session_id"]
+    position = next(row for row in data["rows"] if row["adjustable"])["position"]
+    response = await seeded_client.post(f"/today/{sid}/rows/{position}/adjust?profile=me", data={"sets": "-1"})
+    assert response.status_code == 303
+
+
 async def test_felt_route_records_the_answer(seeded_client: httpx.AsyncClient) -> None:
     sid = (await _today(seeded_client))["session_id"]
     response = await seeded_client.post(f"/today/{sid}/felt?profile=me", data={"felt": "easy"}, headers=HX)

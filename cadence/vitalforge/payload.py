@@ -164,8 +164,15 @@ def _doc_value(exercises: Mapping[str, Any] | None, exercise_id: str, key: str) 
 
 
 def _is_done(row: RowView) -> bool:
-    """A row counts when it was ticked, or when some sets were logged against it."""
-    return bool(row.record.done) or bool(_int_or_none(row.record.sets_done) or 0)
+    """A row counts when it was ticked, or when some sets were logged against it.
+
+    An explicit ``sets_done`` of 0 means the user stepped the row down to nothing: not performed,
+    even when ticked, so it must not fall back to the planned sets in ``_entry``.
+    """
+    sets_done = _int_or_none(row.record.sets_done)
+    if sets_done == 0:
+        return False
+    return bool(row.record.done) or bool(sets_done)
 
 
 def _entry(row: RowView, exercises: Mapping[str, Any] | None) -> dict[str, Any]:

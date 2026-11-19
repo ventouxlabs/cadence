@@ -33,7 +33,7 @@ MAX_SETS = 100
 MAX_SECONDS = 3600
 LOAD_EPSILON = 1e-9
 
-Field = Literal["reps", "load"]
+Field = Literal["reps", "load", "sets"]
 
 
 class TickError(ValueError):
@@ -209,11 +209,11 @@ def adjust(
     settings: ProgramSettings,
     ts: str | None = None,
 ) -> TickResult:
-    """Step reps or load by one, writing the ``*_done`` columns only."""
+    """Step reps, load or sets by one, writing the ``*_done`` columns only."""
     row = view.row(position)
     if row is None:
         raise TickError(f"row {position} is not on this session")
-    if field not in ("reps", "load"):
+    if field not in ("reps", "load", "sets"):
         raise TickError(f"cannot adjust {field!r}")
     if field == "reps" and not row.reps_adjustable:
         raise TickError("a distance row's distance is fixed; only its load can be adjusted")
@@ -223,6 +223,8 @@ def adjust(
         return TickResult(row=row, changed=False)
 
     record = row.record
+    if field == "sets":
+        return _committed(db, _adjust_sets(db, view, row, record, delta))
     if field == "reps":
         return _committed(db, _adjust_reps(db, view, row, record, delta))
     return _committed(db, _adjust_load(db, view, row, record, delta, settings))
@@ -236,6 +238,17 @@ def _adjust_reps(db: Session, view: SessionView, row: RowView, record: SessionRo
     if target == current:
         return TickResult(row=row, changed=False)
     record.reps_done = target
+    return TickResult(row=_stage(db, view, record), changed=True)
+
+
+def _adjust_sets(db: Session, view: SessionView, row: RowView, record: SessionRowRecord, delta: int) -> TickResult:
+    current = row.sets
+    if current is None:
+        return TickResult(row=row, changed=False, notice="This row has no planned sets.")
+    target = max(MIN_REPS, min(MAX_SETS, current + (1 if delta > 0 else -1)))
+    if target == current:
+        return TickResult(row=row, changed=False)
+    record.sets_done = target
     return TickResult(row=_stage(db, view, record), changed=True)
 
 
@@ -302,7 +315,7 @@ def apply_patch(
     for key, upper in (("sets_done", MAX_SETS), ("reps_done", MAX_REPS), ("seconds_done", MAX_SECONDS)):
         if patch.get(key) is None:
             continue
-        if not row.reps_adjustable:
+        if key != "sets_done" and not row.reps_adjustable:
             raise TickError("a distance row's distance is fixed; only its load can be adjusted")
         setattr(row.record, key, max(MIN_REPS, min(upper, int(patch[key]))))
         result = TickResult(row=_stage(db, view, row.record), changed=True)
