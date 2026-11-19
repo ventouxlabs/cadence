@@ -190,7 +190,37 @@ def test_adjust_rejects_an_unknown_field(db_session, seeded) -> None:
     view = _view(db_session)
     row = _first_reps_row(view)
     with pytest.raises(tick_service.TickError):
-        tick_service.adjust(db_session, view, row.position, "sets", 1, DEFAULT_SETTINGS)  # type: ignore[arg-type]
+        tick_service.adjust(db_session, view, row.position, "bogus", 1, DEFAULT_SETTINGS)  # type: ignore[arg-type]
+
+
+def test_row_sets_defaults_to_the_planned_sets(db_session, seeded) -> None:
+    row = _first_reps_row(_view(db_session))
+    assert row.sets == row.spec["sets"]
+
+
+def test_adjust_sets_writes_sets_done_only(db_session, seeded) -> None:
+    view = _view(db_session)
+    row = _first_reps_row(view)
+    planned = row.spec["sets"]
+
+    result = tick_service.adjust(db_session, view, row.position, "sets", -1, DEFAULT_SETTINGS)
+
+    assert result.changed
+    assert result.row.sets == planned - 1
+    assert result.row.record.sets_done == planned - 1
+    assert result.row.record.sets_planned == planned
+    assert result.row.record.reps_done is None
+    assert result.row.record.done is False
+
+
+def test_adjust_sets_up_and_clamps(db_session, seeded) -> None:
+    row = _first_reps_row(_view(db_session))
+    for _ in range(tick_service.MAX_SETS + 5):
+        tick_service.adjust(db_session, _view(db_session), row.position, "sets", 1, DEFAULT_SETTINGS)
+    assert _view(db_session).row(row.position).sets == tick_service.MAX_SETS
+    for _ in range(tick_service.MAX_SETS + 5):
+        tick_service.adjust(db_session, _view(db_session), row.position, "sets", -1, DEFAULT_SETTINGS)
+    assert _view(db_session).row(row.position).sets == tick_service.MIN_REPS
 
 
 # --------------------------------------------------------------- 9, 10, 11: finishing

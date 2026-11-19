@@ -49,6 +49,16 @@
   </span>
   {% if expanded %}
   <div class="stepper-panel">
+    {% if row.sets is not none %}
+    <div class="stepper" role="group" aria-label="Sets done">
+      <span class="stepper-label">sets</span>
+      <button type="submit" class="step" name="sets" value="-1" aria-label="One set fewer" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"sets": "-1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#8722;</button>
+      <output class="step-value" data-sets>{{ row.sets }}</output>
+      <button type="submit" class="step" name="sets" value="1" aria-label="One set more" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"sets": "1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#43;</button>
+    </div>
+    {% endif %}
     {% if row.reps_adjustable and row.reps is not none %}
     <div class="stepper" role="group" aria-label="Reps done">
       <span class="stepper-label">reps</span>

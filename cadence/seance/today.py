@@ -78,6 +78,12 @@ class RowView:
         return int(value) if value is not None else None
 
     @property
+    def sets(self) -> int | None:
+        """Sets done when the user stepped it, else the plan's sets."""
+        value = self.record.sets_done if self.record.sets_done is not None else self.spec.get("sets")
+        return int(value) if value is not None else None
+
+    @property
     def load_kg(self) -> float | None:
         value = self.record.load_done_kg if self.record.load_done_kg is not None else self.spec.get("load_kg")
         return float(value) if value is not None else None
