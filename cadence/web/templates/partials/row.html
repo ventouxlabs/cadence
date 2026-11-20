@@ -59,6 +59,26 @@
               hx-post="{{ adjust_url }}" hx-vals='{"reps": "1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#43;</button>
     </div>
     {% endif %}
+    {% if row.reps_adjustable %}
+    <div class="stepper" role="group" aria-label="Sets done">
+      <span class="stepper-label">sets</span>
+      <button type="submit" class="step" name="sets" value="-1" aria-label="One set fewer" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"sets": "-1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#8722;</button>
+      <output class="step-value" data-sets>{{ row.sets }}</output>
+      <button type="submit" class="step" name="sets" value="1" aria-label="One set more" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"sets": "1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#43;</button>
+    </div>
+    {% endif %}
+    {% if row.reps_adjustable and row.seconds is not none %}
+    <div class="stepper" role="group" aria-label="Seconds held">
+      <span class="stepper-label">seconds</span>
+      <button type="submit" class="step" name="seconds" value="-1" aria-label="Five seconds less" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"seconds": "-1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#8722;</button>
+      <output class="step-value" data-seconds>{{ row.seconds }}</output>
+      <button type="submit" class="step" name="seconds" value="1" aria-label="Five seconds more" formaction="{{ adjust_url }}"
+              hx-post="{{ adjust_url }}" hx-vals='{"seconds": "1"}' hx-include="#confirm-state" hx-target="closest form" hx-swap="outerHTML">&#43;</button>
+    </div>
+    {% endif %}
     {% if row.load_adjustable and row.load_kg is not none %}
     <div class="stepper" role="group" aria-label="Load used">
       <span class="stepper-label">load</span>

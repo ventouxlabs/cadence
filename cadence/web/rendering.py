@@ -77,13 +77,13 @@ def prescription(row: Any, unit: str = "kg") -> str:
     row now claims rather than what it was planned as.
     """
     spec = row.spec
-    sets = spec.get("sets") or 1
+    sets = row.sets
     parts: list[str] = []
     if row.reps is not None:
         per_side = " per side" if spec.get("per_side") else ""
         parts.append(f"{sets} x {row.reps}{per_side} reps" if sets > 1 else f"{row.reps}{per_side} reps")
-    elif spec.get("seconds") is not None:
-        parts.append(f"{sets} x {spec['seconds']} s" if sets > 1 else f"{spec['seconds']} s")
+    elif row.seconds is not None:
+        parts.append(f"{sets} x {row.seconds} s" if sets > 1 else f"{row.seconds} s")
     elif spec.get("meters") is not None:
         metres = f"{float(spec['meters']):g}"
         parts.append(f"{sets} x {metres} m" if sets > 1 else f"{metres} m")
