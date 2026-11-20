@@ -58,7 +58,7 @@ Python 3.12, FastAPI, SQLite (SQLModel or SQLAlchemy), Pydantic v2. PWA front en
 
 ## Prior art
 
-Hevy/Strong: best ≤3-tap logging, no programming. Fitbod: good programming, closed. Nike Training Club: free guided video, no logging. wger: AGPL, self-hosted, REST API, clunky UI, no Garmin write-back. Liftosaur: best progression DSL, web-first, account-gated. Borrow: Hevy's tap economy, Liftosaur's progression-as-data, wger's exercise schema shape.
+Hevy/Strong: best ≤3-tap logging, no programming. Fitbod: good programming, closed. Nike Training Club: free guided video, no logging. wger: AGPL, self-hosted, REST API, clunky UI, no Garmin write-back. Liftosaur: best progression DSL, web-first, account-gated. openGym (https://gitea.com/DuarteSantos/openGym): self-hosted AGPL PWA, Docker Compose, passkey login, per-profile data, v1.4.1 Oct 2026; no youth rules, no Garmin write-back, no checklist; current self-hosted reference point alongside wger. Borrow: Hevy's tap economy, Liftosaur's progression-as-data, wger's exercise schema shape.
 
 ## PRP set
 
