@@ -190,7 +190,7 @@ def test_adjust_rejects_an_unknown_field(db_session, seeded) -> None:
     view = _view(db_session)
     row = _first_reps_row(view)
     with pytest.raises(tick_service.TickError):
-        tick_service.adjust(db_session, view, row.position, "sets", 1, DEFAULT_SETTINGS)  # type: ignore[arg-type]
+        tick_service.adjust(db_session, view, row.position, "bogus", 1, DEFAULT_SETTINGS)  # type: ignore[arg-type]
 
 
 # --------------------------------------------------------------- 9, 10, 11: finishing

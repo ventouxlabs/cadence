@@ -31,9 +31,10 @@ MIN_REPS = 0
 MAX_REPS = 200
 MAX_SETS = 100
 MAX_SECONDS = 3600
+SECONDS_STEP = 5
 LOAD_EPSILON = 1e-9
 
-Field = Literal["reps", "load"]
+Field = Literal["reps", "load", "sets", "seconds"]
 
 
 class TickError(ValueError):
@@ -209,13 +210,13 @@ def adjust(
     settings: ProgramSettings,
     ts: str | None = None,
 ) -> TickResult:
-    """Step reps or load by one, writing the ``*_done`` columns only."""
+    """Step reps, sets, seconds (by 5) or load, writing the ``*_done`` columns only."""
     row = view.row(position)
     if row is None:
         raise TickError(f"row {position} is not on this session")
-    if field not in ("reps", "load"):
+    if field not in ("reps", "load", "sets", "seconds"):
         raise TickError(f"cannot adjust {field!r}")
-    if field == "reps" and not row.reps_adjustable:
+    if field in ("reps", "sets", "seconds") and not row.reps_adjustable:
         raise TickError("a distance row's distance is fixed; only its load can be adjusted")
     if field == "load" and not row.load_adjustable:
         raise TickError("this row has no planned load; its load cannot be adjusted")
@@ -225,6 +226,14 @@ def adjust(
     record = row.record
     if field == "reps":
         return _committed(db, _adjust_reps(db, view, row, record, delta))
+    if field == "sets":
+        return _committed(db, _step_count(db, view, row, "sets_done", row.sets, delta, MAX_SETS))
+    if field == "seconds":
+        if row.seconds is None:
+            return TickResult(row=row, changed=False, notice="This row is not timed.")
+        return _committed(
+            db, _step_count(db, view, row, "seconds_done", row.seconds, delta * SECONDS_STEP, MAX_SECONDS)
+        )
     return _committed(db, _adjust_load(db, view, row, record, delta, settings))
 
 
@@ -237,6 +246,17 @@ def _adjust_reps(db: Session, view: SessionView, row: RowView, record: SessionRo
         return TickResult(row=row, changed=False)
     record.reps_done = target
     return TickResult(row=_stage(db, view, record), changed=True)
+
+
+def _step_count(
+    db: Session, view: SessionView, row: RowView, column: str, current: int, step: int, upper: int
+) -> TickResult:
+    """Step ``sets_done`` or ``seconds_done`` through the same clamp ``apply_patch`` uses."""
+    target = max(MIN_REPS, min(upper, current + step))
+    if target == current:
+        return TickResult(row=row, changed=False)
+    setattr(row.record, column, target)
+    return TickResult(row=_stage(db, view, row.record), changed=True)
 
 
 def _adjust_load(

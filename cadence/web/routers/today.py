@@ -226,6 +226,8 @@ def adjust_row(
     expand: Annotated[str | None, Form()] = None,
     reps: Annotated[int | None, Form()] = None,
     load: Annotated[int | None, Form()] = None,
+    sets: Annotated[int | None, Form()] = None,
+    seconds: Annotated[int | None, Form()] = None,
     confirm: Annotated[str | None, Form()] = None,
 ) -> Response:
     profile_key = _safe_key(profile)
@@ -239,6 +241,10 @@ def adjust_row(
             notice = adjust(db, view, position, "reps", reps, load_settings(db)).notice
         elif load:
             notice = adjust(db, view, position, "load", load, load_settings(db)).notice
+        elif sets:
+            notice = adjust(db, view, position, "sets", sets, load_settings(db)).notice
+        elif seconds:
+            notice = adjust(db, view, position, "seconds", seconds, load_settings(db)).notice
     except TickError as exc:
         # Same split the JSON API makes: a row that is not there is a 404, a row that cannot be
         # adjusted is a 400.
